@@ -1,0 +1,55 @@
+.alert-inline {
+  width: 100%;
+  padding: 16px;
+  border-radius: var(--radius-md);
+  margin-bottom: 20px;
+  border: 1px solid transparent;
+}
+
+.alert-inline-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.alert-inline-text {
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.alert-inline-content {
+  margin-top: 8px;
+  font-size: 0.88rem;
+  padding-left: 30px;
+  color: var(--dark-light);
+}
+
+/* Alert Type Stylings */
+.alert-inline.info {
+  background-color: var(--info-light);
+  border-color: #cff4fc;
+  color: #055160;
+}
+
+.alert-inline.success {
+  background-color: var(--success-light);
+  border-color: #d1e7dd;
+  color: #0f5132;
+}
+
+.alert-inline.warning {
+  background-color: var(--warning-light);
+  border-color: #fff3cd;
+  color: #664d03;
+}
+
+.alert-inline.danger {
+  background-color: var(--danger-light);
+  border-color: #f8d7da;
+  color: #842029;
+}
+
+.alert-inline-icon {
+  flex-shrink: 0;
+}
