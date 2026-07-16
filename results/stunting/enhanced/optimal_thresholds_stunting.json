@@ -1,10 +1,8 @@
 {
-  "SVM": 0.37000000000000005,
-  "Random Forest": 0.38000000000000006,
-  "KNN": 0.3,
-  "Logistic Regression": 0.4300000000000001,
+  "Random Forest": 0.39000000000000007,
+  "Logistic Regression": 0.4200000000000001,
   "Gradient Boosting": 0.3,
   "XGBoost": 0.3,
   "LightGBM": 0.3,
-  "DNN": 0.36000000000000004
+  "DNN": 0.37000000000000005
 }

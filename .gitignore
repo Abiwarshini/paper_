@@ -4,6 +4,8 @@ venv/
 
 # Raw dataset (exceeds GitHub's 100MB limit)
 data/raw/IAKR7EFL.DTA
+data/processed/
+*.parquet
 
 # Compiled python files
 __pycache__/
