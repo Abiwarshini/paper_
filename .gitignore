@@ -1,0 +1,17 @@
+# Virtual environment
+venv/
+.venv/
+
+# Raw dataset (exceeds GitHub's 100MB limit)
+data/raw/IAKR7EFL.DTA
+
+# Compiled python files
+__pycache__/
+*.pyc
+
+# Local IDE/workspace files
+.idea/
+.vscode/
+.gemini/
+.system_generated/
+scratch/
