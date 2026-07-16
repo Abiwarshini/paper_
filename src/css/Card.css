@@ -1,0 +1,135 @@
+/* Metric Cards for Stats */
+.metric-card {
+  background-color: var(--white);
+  border-radius: var(--radius-md);
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--gray-200);
+  transition: var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+
+.metric-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+}
+
+.metric-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background-color: var(--primary);
+}
+
+.metric-card.primary::before { background-color: var(--primary); }
+.metric-card.success::before { background-color: var(--success); }
+.metric-card.warning::before { background-color: var(--warning); }
+.metric-card.danger::before { background-color: var(--danger); }
+.metric-card.info::before { background-color: var(--info); }
+
+.metric-card-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.metric-card-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.metric-card-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.metric-card-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--dark);
+  line-height: 1.2;
+  margin-bottom: 8px;
+}
+
+.metric-card-description {
+  font-size: 0.8rem;
+  color: var(--gray-400);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.metric-trend {
+  font-weight: 600;
+  color: var(--success);
+}
+
+.metric-card-icon-wrapper {
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background-color: var(--gray-100);
+  color: var(--gray-500);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.metric-card.primary .metric-card-icon-wrapper { background-color: var(--primary-light); color: var(--primary); }
+.metric-card.success .metric-card-icon-wrapper { background-color: var(--secondary-light); color: var(--success); }
+.metric-card.warning .metric-card-icon-wrapper { background-color: var(--warning-light); color: var(--warning); }
+.metric-card.danger .metric-card-icon-wrapper { background-color: var(--danger-light); color: var(--danger); }
+.metric-card.info .metric-card-icon-wrapper { background-color: var(--info-light); color: var(--info); }
+
+/* Standard Content Cards */
+.content-card {
+  background-color: var(--white);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--gray-200);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.content-card-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--gray-200);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.content-card-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--dark);
+}
+
+.content-card-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.content-card-body {
+  padding: 24px;
+}
+
+@media (max-width: 576px) {
+  .content-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .content-card-body {
+    padding: 16px;
+  }
+}
