@@ -13,8 +13,7 @@ for early detection of stunting and wasting," Human Nutrition & Metabolism 42, 2
 4. pip install -r requirements.txt
 5. cd src
 6. python 01_prepare_data.py
-7. python 02_run_models.py    (this is the long-running full pipeline)
-
+7. python 02_run_models.py    (this is the long-running full pipeline)9. python ../prediction_pipeline.py --mode enhanced    (build SHAP explainability, risk scores, and personalized recommendations)
 ## Variable mapping: paper (LSMS) -> this replication (DHS)
 
 | Paper variable       | DHS variable used          | Notes                                                          |

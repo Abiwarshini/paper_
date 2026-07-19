@@ -1,8 +1,5 @@
 {
   "Random Forest": 0.33,
   "Logistic Regression": 0.4400000000000001,
-  "Gradient Boosting": 0.3,
-  "XGBoost": 0.3,
-  "LightGBM": 0.3,
-  "DNN": 0.3
+  "XGBoost": 0.3
 }

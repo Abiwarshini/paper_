@@ -5,3 +5,7 @@ imbalanced-learn
 xgboost
 tensorflow
 pyarrow
+shap
+matplotlib
+streamlit
+plotly

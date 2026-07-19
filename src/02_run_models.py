@@ -13,8 +13,9 @@ import json
 import argparse
 import numpy as np
 import pandas as pd
+from pathlib import Path
 from sklearn.model_selection import StratifiedKFold
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier
@@ -51,13 +52,15 @@ CONTINUOUS_STANDARD = ['age_hh_head_proxy', 'hhsize', 'wealth_score', 'child_age
 CATEGORICAL_STANDARD = ['education', 'wealth_quintile', 'residence', 'gender_hh_head', 'dist_market_proxy', 'child_sex']
 
 # Extra features for optimization (clinical, maternal health, water/sanitation)
-CONTINUOUS_EXTRA = ['birth_weight', 'breastfeeding_duration', 'mother_weight', 'mother_height', 'mother_bmi', 'anc_visits']
+CONTINUOUS_EXTRA = ['birth_weight', 'breastfeeding_duration', 'mother_weight', 'mother_height', 'mother_bmi', 'anc_visits',
+                    'mother_underweight', 'low_anc_visits', 'low_birth_weight', 'maternal_risk_score',
+                    'wealth_education_interaction', 'age_breastfeeding_interaction', 'age_sanitation_interaction', 'age_birth_order_interaction']
 CATEGORICAL_EXTRA = ['birth_size', 'birth_weight_source', 'measles_vaccine', 'diarrhea_recent', 'fever_recent', 'cough_recent', 'mother_marital_status', 'water_source', 'toilet_type', 'cooking_fuel']
 
 TUNED_PARAMS = {
     "Random Forest": {"n_estimators": 300, "max_depth": 10, "min_samples_split": 5, "min_samples_leaf": 2},
     "Gradient Boosting": {"n_estimators": 300, "max_depth": 7, "learning_rate": 0.05, "subsample": 0.8},
-    "XGBoost": {"n_estimators": 300, "max_depth": 7, "learning_rate": 0.05, "subsample": 0.8, "colsample_bytree": 0.8},
+    "XGBoost": {"n_estimators": 500, "max_depth": 6, "learning_rate": 0.05, "subsample": 0.9, "colsample_bytree": 0.85, "min_child_weight": 4, "reg_lambda": 2.0, "reg_alpha": 1.0, "gamma": 0.1},
     "KNN": {"n_neighbors": 7, "weights": "distance", "metric": "minkowski", "p": 2},
     "Logistic Regression": {"max_iter": 2000, "C": 0.1, "solver": "lbfgs"},
 }
@@ -97,13 +100,26 @@ def engineer_features(df):
     df['unsafe_toilet'] = (df['toilet_type'].isin([31.0, 97.0])).astype(float)  # 31 = no facility, 97 = not de jure
     df['smoke_fuel'] = (df['cooking_fuel'].isin([2.0, 8.0, 11.0, 6.0, 7.0, 9.0, 10.0])).astype(float)  # wood/charcoal/dung
     df['sanitation_risk_index'] = df['unsafe_water'] + df['unsafe_toilet'] + df['smoke_fuel']
+
+    # 8. Maternal and household risk flags
+    df['mother_underweight'] = (df['mother_bmi'] < 18.5).astype(float)
+    df['low_anc_visits'] = (df['anc_visits'] < 4).astype(float)
+    df['low_birth_weight'] = (df['birth_weight'] < 2.5).astype(float)
+    df['maternal_risk_score'] = df[['mother_underweight', 'low_anc_visits', 'low_birth_weight']].sum(axis=1)
+
+    # 9. Interaction features that often matter in child-health data
+    df['wealth_education_interaction'] = df['wealth_score'] * pd.to_numeric(df['education'], errors='coerce')
+    df['age_breastfeeding_interaction'] = df['child_age_months'] * df['breastfeeding_duration']
+    df['age_sanitation_interaction'] = df['child_age_months'] * df['sanitation_risk_index']
+    df['age_birth_order_interaction'] = df['child_age_months'] * df['birth_order']
     
     df = df.drop(columns=['unsafe_water', 'unsafe_toilet', 'smoke_fuel'])
     return df
 
 
 def load_data(target, mode="standard"):
-    df = pd.read_parquet("../data/processed/dhs_clean.parquet")
+    root = Path(__file__).resolve().parent.parent
+    df = pd.read_parquet(root / "data" / "processed" / "dhs_clean.parquet")
     
     if mode == "enhanced":
         df = engineer_features(df)
@@ -123,7 +139,8 @@ def load_data(target, mode="standard"):
         
     for c in continuous_cols:
         X[c] = X[c].astype(float)
-        X[c] = X[c].fillna(X[c].mean())
+        X[f"{c}_missing"] = X[c].isna().astype(float)
+        X[c] = X[c].fillna(X[c].median())
 
     X = pd.get_dummies(X, columns=categorical_cols, drop_first=False)
     feature_names = X.columns.tolist()
@@ -185,6 +202,10 @@ def get_models(input_dim, class_weight_dict):
             learning_rate=TUNED_PARAMS["XGBoost"]["learning_rate"],
             subsample=TUNED_PARAMS["XGBoost"]["subsample"],
             colsample_bytree=TUNED_PARAMS["XGBoost"]["colsample_bytree"],
+            min_child_weight=TUNED_PARAMS["XGBoost"]["min_child_weight"],
+            reg_lambda=TUNED_PARAMS["XGBoost"]["reg_lambda"],
+            reg_alpha=TUNED_PARAMS["XGBoost"]["reg_alpha"],
+            gamma=TUNED_PARAMS["XGBoost"]["gamma"],
             eval_metric="logloss",
             scale_pos_weight=class_weight_dict[0] / class_weight_dict[1],
             random_state=RANDOM_STATE, n_jobs=-1),
@@ -198,7 +219,7 @@ def get_models(input_dim, class_weight_dict):
     return models
 
 
-def run_for_target(target, mode="standard", n_folds=5):
+def run_for_target(target, mode="standard", n_folds=5, fast=False):
     print(f"\n{'='*70}\nTARGET: {target.upper()} | MODE: {mode.upper()} | FOLDS: {n_folds}\n{'='*70}")
     X, y, feature_names = load_data(target, mode)
     print("X shape:", X.shape, " prevalence:", y.mean().round(4))
@@ -206,8 +227,11 @@ def run_for_target(target, mode="standard", n_folds=5):
     skf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=RANDOM_STATE)
 
     if mode == "enhanced":
-        # Drop SVM and KNN to save 80% computation time in enhanced mode since they perform poorly in high dimensions
-        model_names = ["Random Forest", "Logistic Regression", "Gradient Boosting", "XGBoost", "DNN"]
+        if fast:
+            model_names = ["Random Forest", "Logistic Regression", "XGBoost"]
+        else:
+            # Drop SVM and KNN to save 80% computation time in enhanced mode since they perform poorly in high dimensions
+            model_names = ["Random Forest", "Logistic Regression", "Gradient Boosting", "XGBoost", "DNN"]
     else:
         model_names = ["SVM", "Random Forest", "KNN", "Logistic Regression", "Gradient Boosting", "XGBoost", "DNN"]
     if HAS_LGB:
@@ -225,7 +249,7 @@ def run_for_target(target, mode="standard", n_folds=5):
         y_train, y_test = y[train_idx], y[test_idx]
 
         # Standardisation (fit on train only)
-        scaler = StandardScaler()
+        scaler = RobustScaler()
         X_train_s = scaler.fit_transform(X_train_raw)
         X_test_s = scaler.transform(X_test_raw)
 
@@ -271,22 +295,23 @@ def run_for_target(target, mode="standard", n_folds=5):
             oof_preds[name][test_idx] = (proba >= 0.5).astype(int)
             print(f"  {name}: fold accuracy = {accuracy_score(y_test, oof_preds[name][test_idx]):.4f}")
 
-        # DNN Classifier
-        if USE_TF:
-            dnn = build_dnn(X_train_bal.shape[1])
-            es = keras.callbacks.EarlyStopping(patience=5, restore_best_weights=True, monitor="val_loss")
-            # Increased batch_size for faster training on CPU
-            dnn.fit(X_train_bal, y_train_bal, validation_split=0.1, epochs=50,
-                    batch_size=2048, callbacks=[es], verbose=0)
-            proba = dnn.predict(X_test_p, verbose=0).ravel()
-        else:
-            dnn = build_mlp()
-            dnn.fit(X_train_bal, y_train_bal)
-            proba = dnn.predict_proba(X_test_p)[:, 1]
+        if "DNN" in model_names:
+            # DNN Classifier
+            if USE_TF:
+                dnn = build_dnn(X_train_bal.shape[1])
+                es = keras.callbacks.EarlyStopping(patience=5, restore_best_weights=True, monitor="val_loss")
+                # Increased batch_size for faster training on CPU
+                dnn.fit(X_train_bal, y_train_bal, validation_split=0.1, epochs=50,
+                        batch_size=2048, callbacks=[es], verbose=0)
+                proba = dnn.predict(X_test_p, verbose=0).ravel()
+            else:
+                dnn = build_mlp()
+                dnn.fit(X_train_bal, y_train_bal)
+                proba = dnn.predict_proba(X_test_p)[:, 1]
 
-        oof_proba["DNN"][test_idx] = proba
-        oof_preds["DNN"][test_idx] = (proba >= 0.5).astype(int)
-        print(f"  DNN: fold accuracy = {accuracy_score(y_test, oof_preds['DNN'][test_idx]):.4f}")
+            oof_proba["DNN"][test_idx] = proba
+            oof_preds["DNN"][test_idx] = (proba >= 0.5).astype(int)
+            print(f"  DNN: fold accuracy = {accuracy_score(y_test, oof_preds['DNN'][test_idx]):.4f}")
 
     # ---- Optimize decision thresholds based on F1 score ----
     print("\n=== Optimizing decision thresholds ===")
@@ -361,7 +386,7 @@ def run_for_target(target, mode="standard", n_folds=5):
 
     # Feature importance from Random Forest on full scaled data (not PCA)
     print(f"\nFitting full Random Forest for feature importance ({target})...")
-    scaler = StandardScaler()
+    scaler = RobustScaler()
     X_s = scaler.fit_transform(X)
     rf_full = RandomForestClassifier(n_estimators=300, max_depth=10, min_samples_split=5,
                                       class_weight="balanced", random_state=RANDOM_STATE, n_jobs=-1)
@@ -381,10 +406,12 @@ if __name__ == "__main__":
                         help="Modeling mode: 'standard' for baseline replication, 'enhanced' for optimized accuracy.")
     parser.add_argument("--folds", type=int, default=5,
                         help="Number of cross-validation folds (default: 5).")
+    parser.add_argument("--fast", action="store_true",
+                        help="Skip slower models such as Gradient Boosting and DNN for rapid experimentation.")
     args = parser.parse_args()
 
     all_results = {}
     for target in ["stunting", "wasting"]:
-        results, proba, y = run_for_target(target, mode=args.mode, n_folds=args.folds)
+        results, proba, y = run_for_target(target, mode=args.mode, n_folds=args.folds, fast=args.fast)
         all_results[target] = results
     print("\n\nALL RUNS COMPLETED SUCCESSFULLY.")
