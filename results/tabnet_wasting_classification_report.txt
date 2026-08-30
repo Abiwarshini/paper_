@@ -1,0 +1,8 @@
+              precision    recall  f1-score   support
+
+  Not Wasted       0.84      0.65      0.73     16166
+      Wasted       0.24      0.48      0.32      3719
+
+    accuracy                           0.62     19885
+   macro avg       0.54      0.57      0.53     19885
+weighted avg       0.73      0.62      0.66     19885

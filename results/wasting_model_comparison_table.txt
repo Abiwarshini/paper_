@@ -1,0 +1,19 @@
+WASTING MODEL COMPARISON
+==========================================================================
+Model          Target     Accuracy  Precision  Recall    F1        ROC-AUC
+--------------------------------------------------------------------------
+XGBoost        Wasting      78.07%     30.64%   13.65%   18.89%    60.76%
+DNN            Wasting      60.68%     24.66%   53.64%   33.79%    61.28%
+TabNet         Wasting      61.80%     24.00%   48.13%   32.03%    59.43%
+==========================================================================
+
+TABNET TARGET COMPARISON
+==========================================================================
+Model          Target     Accuracy  Precision  Recall    F1        ROC-AUC
+--------------------------------------------------------------------------
+TabNet Stunting Stunting     61.55%     47.64%   64.28%   54.73%    66.76%
+TabNet Wasting Wasting      61.80%     24.00%   48.13%   32.03%    59.43%
+==========================================================================
+
+Note: XGBoost values are the existing enhanced-results values, evaluated at its saved optimal threshold.
+DNN and TabNet values use the saved baseline metrics at threshold 0.5.

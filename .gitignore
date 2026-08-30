@@ -1,0 +1,37 @@
+# Virtual environment
+venv/
+.venv/
+
+# Raw dataset (exceeds GitHub's 100MB limit)
+data/raw/IAKR7EFL.DTA
+data/processed/
+*.parquet
+
+# Compiled python files
+__pycache__/
+*.pyc
+
+# Local IDE/workspace files
+.idea/
+.vscode/
+.gemini/
+.system_generated/
+scratch/
+
+# Large generated prediction files
+outputs/predictions.csv
+outputs/stunting/predictions_stunting.csv
+outputs/wasting/predictions_wasting.csv
+
+# Temporary logs and duplicate files
+dnn_training_run.log
+pipeline_run.log
+run.log
+run - Copy.log
+test_out.txt
+test_out - Copy.txt
+recommendation_engine - Copy.py
+risk_score - Copy.py
+shap_analysis - Copy.py
+threshold_sweep - Copy.py
+requirements - Copy.txt

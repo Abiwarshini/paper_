@@ -1,0 +1,8 @@
+              precision    recall  f1-score   support
+
+ Not Stunted       0.75      0.60      0.67     12696
+     Stunted       0.48      0.64      0.55      7189
+
+    accuracy                           0.62     19885
+   macro avg       0.61      0.62      0.61     19885
+weighted avg       0.65      0.62      0.62     19885
