@@ -1,0 +1,148 @@
+{
+  "model_name": "XGBoost Multi-Label Classifier",
+  "exact_match_accuracy": 0.9943,
+  "hamming_loss": 0.001,
+  "macro_f1": 0.9913,
+  "weighted_f1": 0.997,
+  "micro_f1": 0.997,
+  "macro_precision": 0.9935,
+  "macro_recall": 0.9892,
+  "macro_roc_auc": 1.0,
+  "per_class_metrics": {
+    "Underweight": {
+      "accuracy": 1.0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1_score": 1.0,
+      "roc_auc": 1.0,
+      "positive_count": 3376,
+      "total_count": 15000
+    },
+    "Stunting": {
+      "accuracy": 0.9983,
+      "precision": 0.9967,
+      "recall": 0.9955,
+      "f1_score": 0.9961,
+      "roc_auc": 1.0,
+      "positive_count": 3309,
+      "total_count": 15000
+    },
+    "Wasting": {
+      "accuracy": 1.0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1_score": 1.0,
+      "roc_auc": 1.0,
+      "positive_count": 1846,
+      "total_count": 15000
+    },
+    "Overweight": {
+      "accuracy": 0.9983,
+      "precision": 0.9971,
+      "recall": 0.9905,
+      "f1_score": 0.9938,
+      "roc_auc": 1.0,
+      "positive_count": 2103,
+      "total_count": 15000
+    },
+    "Obesity": {
+      "accuracy": 0.9986,
+      "precision": 0.9975,
+      "recall": 0.999,
+      "f1_score": 0.9983,
+      "roc_auc": 1.0,
+      "positive_count": 6054,
+      "total_count": 15000
+    },
+    "Anemia Risk": {
+      "accuracy": 0.9984,
+      "precision": 0.996,
+      "recall": 0.9803,
+      "f1_score": 0.9881,
+      "roc_auc": 1.0,
+      "positive_count": 1013,
+      "total_count": 15000
+    },
+    "Micronutrient Deficiency": {
+      "accuracy": 0.9994,
+      "precision": 0.9669,
+      "recall": 0.959,
+      "f1_score": 0.963,
+      "roc_auc": 1.0,
+      "positive_count": 122,
+      "total_count": 15000
+    }
+  },
+  "confusion_matrices": {
+    "Underweight": [
+      [
+        11624,
+        0
+      ],
+      [
+        0,
+        3376
+      ]
+    ],
+    "Stunting": [
+      [
+        11680,
+        11
+      ],
+      [
+        15,
+        3294
+      ]
+    ],
+    "Wasting": [
+      [
+        13154,
+        0
+      ],
+      [
+        0,
+        1846
+      ]
+    ],
+    "Overweight": [
+      [
+        12891,
+        6
+      ],
+      [
+        20,
+        2083
+      ]
+    ],
+    "Obesity": [
+      [
+        8931,
+        15
+      ],
+      [
+        6,
+        6048
+      ]
+    ],
+    "Anemia Risk": [
+      [
+        13983,
+        4
+      ],
+      [
+        20,
+        993
+      ]
+    ],
+    "Micronutrient Deficiency": [
+      [
+        14874,
+        4
+      ],
+      [
+        5,
+        117
+      ]
+    ]
+  }
+}
