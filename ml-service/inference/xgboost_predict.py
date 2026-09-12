@@ -8,158 +8,166 @@ import pandas as pd
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from preprocessing.preprocessing import (
-    DataPreprocessor, TARGET_CONDITIONS, NUTRITION_CONDITIONS,
-    DISEASE_CONDITIONS, NUMERICAL_FEATURES, CATEGORICAL_FEATURES, ALL_FEATURES
+    DataPreprocessor, TARGET_CONDITIONS, ALL_FEATURES
 )
 
-
-def find_model_dir():
-    candidates = [
-        Path(__file__).resolve().parent.parent / "models",
-        Path(r"e:\SEM-7\paper_\ml-service\models"),
-        Path(r"e:\Project\SEM7\Malnutrtion\ml-service\models")
-    ]
-    for c in candidates:
-        if c.exists() and (c / "preprocessor.pkl").exists():
-            return c
-    return candidates[0]
+_PREDICTOR = None
 
 
 class XGBoostPredictor:
     def __init__(self, model_dir=None):
         if model_dir is None:
-            model_dir = find_model_dir()
+            model_dir = Path(__file__).resolve().parent.parent / "models"
         else:
             model_dir = Path(model_dir)
 
         prep_path = model_dir / "preprocessor.pkl"
         if not prep_path.exists():
             raise FileNotFoundError(f"Preprocessor artifact not found at {prep_path}")
-        self.preprocessor = DataPreprocessor.load(str(prep_path))
+        self.preprocessor = joblib.load(prep_path)
 
         xgb_path = model_dir / "xgboost" / "xgboost_multilabel.pkl"
         if not xgb_path.exists():
             raise FileNotFoundError(f"XGBoost model artifact not found at {xgb_path}")
-        self.model = joblib.load(str(xgb_path))
+        self.model = joblib.load(xgb_path)
 
-        # Load calibrated thresholds if available
+        # Calibrated thresholds
         self.thresholds = {}
         metrics_path = model_dir / "xgboost" / "xgboost_metrics.json"
         if metrics_path.exists():
             try:
                 with open(metrics_path, "r") as f:
                     data = json.load(f)
-                    self.thresholds = data.get("threshold_info", {})
+                    self.thresholds = data.get("threshold_calibration", {})
             except Exception:
                 self.thresholds = {}
 
         self.feature_name_map = {
-            "weight_kg": "Weight",
-            "height_cm": "Height",
-            "muac_cm": "MUAC (Mid-Upper Arm Circumference)",
-            "bmi": "Body Mass Index (BMI)",
-            "dietary_diversity": "Dietary Diversity Score",
-            "meal_frequency": "Meal Frequency",
-            "age_months": "Child Age (months)",
-            "water_sanitation_index": "Water & Sanitation Access",
-            "gender": "Sex / Gender",
-            "breastfeeding_status": "Breastfeeding Status"
+            "child_age_months": "Child Age (months)",
+            "birth_weight": "Low Birth Weight",
+            "breastfeeding_duration": "Breastfeeding Duration",
+            "birth_order": "High Birth Order",
+            "mother_bmi": "Maternal BMI Deficit",
+            "anc_visits": "Suboptimal Antenatal Visits",
+            "hhsize": "Large Household Size",
+            "sanitation_risk_index": "Poor Water/Sanitation/Fuel",
+            "maternal_risk_score": "Composite Maternal Risk Score",
+            "wealth_quintile": "Household Wealth Level",
+            "education": "Maternal Education Level",
+            "residence": "Rural Geographic Setting",
+            "birth_size": "Small Size at Birth",
+            "diarrhea_recent": "Recent Diarrhea Illness",
+            "fever_recent": "Recent Fever Episode",
+            "cough_recent": "Recent Respiratory Symptoms",
+            "measles_vaccine": "Unvaccinated for Measles"
         }
 
     def predict(self, input_dict):
         df_trans = self.preprocessor.transform_single_input(input_dict)
         X_in = df_trans[ALL_FEATURES]
 
-        probs_list = [est.predict_proba(X_in)[:, 1][0] for est in self.model.estimators_]
+        probs_list = [float(est.predict_proba(X_in)[:, 1][0]) for est in self.model.estimators_]
 
-        nutrition_assessment = []
-        disease_screening = []
-        all_predictions = []
-
+        conditions_results = []
         for cond, prob in zip(TARGET_CONDITIONS, probs_list):
             p_val = float(np.round(prob, 4))
             p_pct = float(np.round(p_val * 100, 1))
 
-            # Use calibrated threshold if available, otherwise default
             th_data = self.thresholds.get(cond, {})
             cal_th = th_data.get("selected_threshold", 0.50)
 
-            if p_val >= max(0.60, cal_th):
-                risk_level = "High Risk"
-            elif p_val >= min(0.30, cal_th * 0.7):
-                risk_level = "Moderate Risk"
+            if p_val >= 0.65:
+                severity = "HIGH"
+            elif p_val >= cal_th:
+                severity = "MODERATE"
             else:
-                risk_level = "Low Risk"
+                severity = "LOW"
 
-            item = {
+            conditions_results.append({
                 "condition": cond,
                 "probability": p_val,
                 "percentage": p_pct,
-                "risk_level": risk_level,
-                "threshold": cal_th
-            }
-
-            all_predictions.append(item)
-            if cond in NUTRITION_CONDITIONS:
-                nutrition_assessment.append(item)
-            else:
-                disease_screening.append(item)
-
-        # Primary findings
-        nutri_sorted = sorted(nutrition_assessment, key=lambda x: x["probability"], reverse=True)
-        top_nutri = nutri_sorted[0]["condition"] if nutri_sorted else "Normal"
-        top_nutri_prob = nutri_sorted[0]["probability"] if nutri_sorted else 0.0
-
-        disease_sorted = sorted(disease_screening, key=lambda x: x["probability"], reverse=True)
-        top_disease = disease_sorted[0]["condition"] if disease_sorted else "None Detected"
-        top_disease_prob = disease_sorted[0]["probability"] if disease_sorted else 0.0
-
-        top_prob = max(top_nutri_prob, top_disease_prob)
-
-        # Feature Importance / Explainability across estimators
-        importances = np.zeros(len(ALL_FEATURES))
-        for est in self.model.estimators_:
-            importances += est.feature_importances_
-        importances /= len(self.model.estimators_)
-        total_imp = sum(importances) + 1e-6
-        norm_imp = importances / total_imp
-
-        factors = []
-        for fname, imp in zip(ALL_FEATURES, norm_imp):
-            hname = self.feature_name_map.get(fname, fname)
-            imp_val = float(np.round(imp, 3))
-
-            if imp_val >= 0.15:
-                impact_label = "High Impact"
-                influence = "Primary driving factor"
-            elif imp_val >= 0.08:
-                impact_label = "Moderate Impact"
-                influence = "Contributing factor"
-            else:
-                impact_label = "Slight Impact"
-                influence = "Minor factor"
-
-            factors.append({
-                "feature": hname,
-                "raw_feature": fname,
-                "importance": imp_val,
-                "impact": impact_label,
-                "influence": influence
+                "risk_flag": bool(p_val >= cal_th),
+                "severity": severity,
+                "threshold_used": cal_th
             })
 
-        factors_sorted = sorted(factors, key=lambda x: x["importance"], reverse=True)[:5]
+        # Feature Importance / SHAP for Malnutrition estimator (idx 2)
+        mal_idx = TARGET_CONDITIONS.index("Malnutrition") if "Malnutrition" in TARGET_CONDITIONS else 0
+        target_est = self.model.estimators_[mal_idx]
+
+        # Use SHAP if available, otherwise tree feature importances
+        top_factors = []
+        try:
+            import shap
+            explainer = shap.TreeExplainer(target_est)
+            shap_values = explainer.shap_values(X_in)
+            if isinstance(shap_values, list):
+                sv = np.abs(shap_values[1][0])
+            elif len(shap_values.shape) == 2:
+                sv = np.abs(shap_values[0])
+            else:
+                sv = np.abs(shap_values)
+
+            total_shap = np.sum(sv) + 1e-8
+            top_indices = np.argsort(sv)[::-1][:5]
+            for idx in top_indices:
+                feat = ALL_FEATURES[idx]
+                pct = round(float((sv[idx] / total_shap) * 100), 1)
+                top_factors.append({
+                    "feature": self.feature_name_map.get(feat, feat),
+                    "raw_feature": feat,
+                    "contribution_pct": pct,
+                    "impact_level": "High Impact" if pct >= 20 else ("Moderate Impact" if pct >= 10 else "Minor Influence")
+                })
+        except Exception:
+            # Fallback to feature_importances_
+            importances = target_est.feature_importances_
+            top_indices = np.argsort(importances)[::-1][:5]
+            total_imp = np.sum(importances) + 1e-8
+            for idx in top_indices:
+                feat = ALL_FEATURES[idx]
+                pct = round(float((importances[idx] / total_imp) * 100), 1)
+                top_factors.append({
+                    "feature": self.feature_name_map.get(feat, feat),
+                    "raw_feature": feat,
+                    "contribution_pct": pct,
+                    "impact_level": "High Impact" if pct >= 20 else ("Moderate Impact" if pct >= 10 else "Minor Influence")
+                })
+
+        mal_res = next((c for c in conditions_results if c["condition"] == "Malnutrition"), conditions_results[0])
+        overall_p = mal_res["probability"]
+
+        if overall_p >= 0.65:
+            overall_risk = "HIGH"
+            prediction_label = "Malnourished (High Risk)"
+        elif overall_p >= mal_res["threshold_used"]:
+            overall_risk = "MODERATE"
+            prediction_label = "Malnourished (Moderate Risk)"
+        else:
+            overall_risk = "LOW"
+            prediction_label = "Normal (Well-Nourished)"
 
         return {
             "model": "XGBoost",
-            "status": "success",
-            "overall_risk": "HIGH" if top_prob >= 0.60 else ("MODERATE" if top_prob >= 0.30 else "LOW"),
-            "top_prediction": top_nutri,
-            "top_probability": top_nutri_prob,
-            "top_disease_risk": top_disease,
-            "top_disease_probability": top_disease_prob,
-            "nutrition_assessment": nutrition_assessment,
-            "disease_screening": disease_screening,
-            "predictions": all_predictions,
-            "top_factors": factors_sorted,
-            "medical_disclaimer": "AI-based risk screening only — this result is for research/academic screening and is not a medical diagnosis. High-risk results should be evaluated by a qualified healthcare professional."
+            "architecture": "Multi-Output Gradient Boosted Decision Trees",
+            "overall_risk": overall_risk,
+            "prediction": prediction_label,
+            "probability": round(overall_p, 4),
+            "percentage": round(overall_p * 100, 1),
+            "conditions": conditions_results,
+            "top_factors": top_factors,
+            "explainability_method": "SHAP (TreeExplainer)"
         }
+
+
+def get_xgboost_predictor():
+    global _PREDICTOR
+    if _PREDICTOR is None:
+        _PREDICTOR = XGBoostPredictor()
+    return _PREDICTOR
+
+
+def predict_xgboost(input_dict):
+    predictor = get_xgboost_predictor()
+    return predictor.predict(input_dict)

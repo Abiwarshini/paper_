@@ -14,7 +14,7 @@ from sklearn.metrics import (
     confusion_matrix, hamming_loss
 )
 
-# Add parent directory to sys.path
+# Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from preprocessing.preprocessing import (
     prepare_data_splits, TARGET_CONDITIONS, NUMERICAL_FEATURES,
@@ -22,140 +22,81 @@ from preprocessing.preprocessing import (
 )
 
 
-class FTTransformer(nn.Module):
-    """
-    FT-Transformer (Feature Tokenizer Transformer) for Tabular Multi-Target Malnutrition Prediction.
-    - Numerical Feature Tokenizer: learned projection into token space (d_token)
-    - Categorical Feature Tokenizer: entity embedding layers
-    - [CLS] token prepended to token sequence
-    - Transformer Encoder Stack (multi-head self-attention + feed-forward)
-    - Multi-target prediction head across Stunting, Wasting, Malnutrition
-    """
-
-    def __init__(
-        self,
-        num_numerical=len(NUMERICAL_FEATURES),
-        categorical_cardinalities=[2, 4, 5, 2, 5, 2, 2, 2, 2],
-        d_token=64,
-        n_layers=3,
-        n_heads=4,
-        d_ffn=128,
-        dropout=0.1,
-        n_targets=len(TARGET_CONDITIONS)
-    ):
-        super(FTTransformer, self).__init__()
-
-        self.num_numerical = num_numerical
-        self.d_token = d_token
-        self.n_targets = n_targets
-
-        # Numerical Tokenizer
-        self.num_weights = nn.Parameter(torch.randn(num_numerical, d_token) * 0.01)
-        self.num_biases = nn.Parameter(torch.zeros(num_numerical, d_token))
-
-        # Categorical Tokenizer
-        self.cat_embeddings = nn.ModuleList([
-            nn.Embedding(cardinality, d_token) for cardinality in categorical_cardinalities
-        ])
-
-        # [CLS] Token
-        self.cls_token = nn.Parameter(torch.zeros(1, 1, d_token))
-        nn.init.trunc_normal_(self.cls_token, std=0.02)
-
-        # Transformer Encoder Stack
-        encoder_layer = nn.TransformerEncoderLayer(
-            d_model=d_token,
-            nhead=n_heads,
-            dim_feedforward=d_ffn,
-            dropout=dropout,
-            activation="gelu",
-            batch_first=True,
-            norm_first=True
-        )
-        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=n_layers)
-
-        # Classification Head
-        self.norm = nn.LayerNorm(d_token)
-        self.head = nn.Sequential(
-            nn.Linear(d_token, d_token),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(d_token, n_targets)
-        )
-
-    def forward(self, x_num, x_cat):
-        batch_size = x_num.shape[0]
-
-        # Numerical Tokenizer: (batch, num_num, d_token)
-        num_tokens = x_num.unsqueeze(-1) * self.num_weights.unsqueeze(0) + self.num_biases.unsqueeze(0)
-
-        # Categorical Tokenizer: (batch, num_cat, d_token)
-        cat_tokens_list = []
-        for i, emb in enumerate(self.cat_embeddings):
-            cat_tokens_list.append(emb(x_cat[:, i]).unsqueeze(1))
-        cat_tokens = torch.cat(cat_tokens_list, dim=1)
-
-        # Concatenate tokens
-        tokens = torch.cat([num_tokens, cat_tokens], dim=1)
-
-        # Prepend [CLS]
-        cls_expanded = self.cls_token.expand(batch_size, -1, -1)
-        tokens = torch.cat([cls_expanded, tokens], dim=1)
-
-        # Transformer pass
-        encoded = self.transformer(tokens)
-
-        # Extract [CLS]
-        cls_out = self.norm(encoded[:, 0])
-        logits = self.head(cls_out)
-        return logits
-
-
 class TabularDataset(Dataset):
     def __init__(self, X_df, Y_df=None):
-        self.X_num = torch.tensor(X_df[NUMERICAL_FEATURES].values.astype(np.float32), dtype=torch.float32)
-        self.X_cat = torch.tensor(X_df[CATEGORICAL_FEATURES].values.astype(np.int64), dtype=torch.long)
+        self.X = torch.tensor(X_df[ALL_FEATURES].values.astype(np.float32), dtype=torch.float32)
         if Y_df is not None:
             self.Y = torch.tensor(Y_df[TARGET_CONDITIONS].values.astype(np.float32), dtype=torch.float32)
         else:
             self.Y = None
 
     def __len__(self):
-        return len(self.X_num)
+        return len(self.X)
 
     def __getitem__(self, idx):
         if self.Y is not None:
-            return self.X_num[idx], self.X_cat[idx], self.Y[idx]
-        return self.X_num[idx], self.X_cat[idx]
+            return self.X[idx], self.Y[idx]
+        return self.X[idx]
 
 
-def train_and_evaluate_transformer(
-    d_token=64,
-    n_layers=2,
-    n_heads=4,
-    d_ffn=128,
-    dropout=0.1,
-    epochs=4,
-    batch_size=1024,
-    learning_rate=2e-3,
-    weight_decay=1e-4,
-    patience=3,
-    max_train_samples=50000,
+class TabularDNN(nn.Module):
+    """
+    Deep Neural Network for Tabular Malnutrition Prediction:
+    Input (18) -> Dense(256) -> BatchNorm -> ReLU -> Dropout(0.2)
+               -> Dense(128) -> BatchNorm -> ReLU -> Dropout(0.2)
+               -> Dense(64) -> ReLU
+               -> Output Head (3 targets: Stunting, Wasting, Malnutrition)
+    """
+
+    def __init__(self, input_dim=len(ALL_FEATURES), num_targets=len(TARGET_CONDITIONS), dropout=0.2):
+        super(TabularDNN, self).__init__()
+
+        self.block1 = nn.Sequential(
+            nn.Linear(input_dim, 256),
+            nn.BatchNorm1d(256),
+            nn.ReLU(),
+            nn.Dropout(dropout)
+        )
+
+        self.block2 = nn.Sequential(
+            nn.Linear(256, 128),
+            nn.BatchNorm1d(128),
+            nn.ReLU(),
+            nn.Dropout(dropout)
+        )
+
+        self.block3 = nn.Sequential(
+            nn.Linear(128, 64),
+            nn.BatchNorm1d(64),
+            nn.ReLU()
+        )
+
+        self.output_head = nn.Linear(64, num_targets)
+
+    def forward(self, x):
+        x = self.block1(x)
+        x = self.block2(x)
+        x = self.block3(x)
+        logits = self.output_head(x)
+        return logits
+
+
+def train_and_evaluate_dnn(
+    epochs=15,
+    batch_size=512,
+    learning_rate=1e-3,
+    dropout=0.2,
+    patience=4,
     random_state=42
 ):
-    print("=== Training FT-Transformer on DHS Dataset (Optimized CPU) ===")
+    print("=== Training Tabular Deep Neural Network (DNN) on DHS Dataset ===")
     torch.manual_seed(random_state)
     np.random.seed(random_state)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using compute device: {device}")
 
+    start_time = time.time()
     (X_train, Y_train), (X_val, Y_val), (X_test, Y_test), preprocessor = prepare_data_splits(random_state=random_state)
-
-    if max_train_samples and len(X_train) > max_train_samples:
-        indices = np.random.RandomState(random_state).choice(len(X_train), max_train_samples, replace=False)
-        X_train = X_train.iloc[indices]
-        Y_train = Y_train.iloc[indices]
-        print(f"Subsampled train set for efficient CPU training: {len(X_train):,} samples.")
 
     train_dataset = TabularDataset(X_train, Y_train)
     val_dataset = TabularDataset(X_val, Y_val)
@@ -165,61 +106,54 @@ def train_and_evaluate_transformer(
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-    cardinalities = [len(preprocessor.cat_encoders[c].classes_) for c in CATEGORICAL_FEATURES]
+    model = TabularDNN(input_dim=len(ALL_FEATURES), num_targets=len(TARGET_CONDITIONS), dropout=dropout).to(device)
 
-    model = FTTransformer(
-        num_numerical=len(NUMERICAL_FEATURES),
-        categorical_cardinalities=cardinalities,
-        d_token=d_token,
-        n_layers=n_layers,
-        n_heads=n_heads,
-        d_ffn=d_ffn,
-        dropout=dropout,
-        n_targets=len(TARGET_CONDITIONS)
-    ).to(device)
-
-    # Class positive weights
+    # Calculate class positive weights for BCEWithLogitsLoss
     pos_counts = Y_train.sum(axis=0).values
     neg_counts = len(Y_train) - pos_counts
     pos_weights = torch.tensor(neg_counts / (pos_counts + 1e-5), dtype=torch.float32).to(device)
     criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weights)
 
-    optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+    optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=2)
 
     best_val_loss = float("inf")
     best_weights = None
     no_improve = 0
 
-    print(f"\nBeginning FT-Transformer Training across {epochs} epochs...")
+    print(f"\nBeginning DNN Training across {epochs} epochs (Train: {len(X_train):,}, Val: {len(X_val):,})...")
     train_start = time.time()
 
     for epoch in range(1, epochs + 1):
         model.train()
         total_train_loss = 0.0
 
-        for x_num, x_cat, y in train_loader:
-            x_num, x_cat, y = x_num.to(device), x_cat.to(device), y.to(device)
+        for x_batch, y_batch in train_loader:
+            x_batch, y_batch = x_batch.to(device), y_batch.to(device)
 
             optimizer.zero_grad()
-            logits = model(x_num, x_cat)
-            loss = criterion(logits, y)
+            logits = model(x_batch)
+            loss = criterion(logits, y_batch)
             loss.backward()
             optimizer.step()
 
-            total_train_loss += loss.item() * len(y)
+            total_train_loss += loss.item() * len(x_batch)
 
         train_loss = total_train_loss / len(train_dataset)
 
-        # Validation
+        # Validation phase
         model.eval()
         total_val_loss = 0.0
+        val_preds_list = []
+
         with torch.no_grad():
-            for x_num, x_cat, y in val_loader:
-                x_num, x_cat, y = x_num.to(device), x_cat.to(device), y.to(device)
-                logits = model(x_num, x_cat)
-                loss = criterion(logits, y)
-                total_val_loss += loss.item() * len(y)
+            for x_batch, y_batch in val_loader:
+                x_batch, y_batch = x_batch.to(device), y_batch.to(device)
+                logits = model(x_batch)
+                loss = criterion(logits, y_batch)
+                total_val_loss += loss.item() * len(x_batch)
+                probs = torch.sigmoid(logits).cpu().numpy()
+                val_preds_list.append(probs)
 
         val_loss = total_val_loss / len(val_dataset)
         scheduler.step(val_loss)
@@ -233,20 +167,20 @@ def train_and_evaluate_transformer(
         else:
             no_improve += 1
             if no_improve >= patience:
-                print(f"Early stopping at epoch {epoch}.")
+                print(f"Early stopping triggered at epoch {epoch} (patience={patience}).")
                 break
 
     training_time_sec = round(time.time() - train_start, 2)
+    print(f"DNN training completed in {training_time_sec}s. Restoring best weights...")
     model.load_state_dict(best_weights)
-    print(f"FT-Transformer training complete in {training_time_sec}s!")
 
-    # Threshold calibration on validation set
+    # Validation Threshold Tuning
     model.eval()
     val_probs_list = []
     with torch.no_grad():
-        for x_num, x_cat, _ in val_loader:
-            x_num, x_cat = x_num.to(device), x_cat.to(device)
-            probs = torch.sigmoid(model(x_num, x_cat)).cpu().numpy()
+        for x_batch, _ in val_loader:
+            x_batch = x_batch.to(device)
+            probs = torch.sigmoid(model(x_batch)).cpu().numpy()
             val_probs_list.append(probs)
     val_probs = np.concatenate(val_probs_list, axis=0)
 
@@ -276,15 +210,16 @@ def train_and_evaluate_transformer(
     test_start = time.time()
     test_probs_list = []
     with torch.no_grad():
-        for x_num, x_cat, _ in test_loader:
-            x_num, x_cat = x_num.to(device), x_cat.to(device)
-            probs = torch.sigmoid(model(x_num, x_cat)).cpu().numpy()
+        for x_batch, _ in test_loader:
+            x_batch = x_batch.to(device)
+            probs = torch.sigmoid(model(x_batch)).cpu().numpy()
             test_probs_list.append(probs)
     test_probs = np.concatenate(test_probs_list, axis=0)
 
     inference_time_sec = round(time.time() - test_start, 4)
     per_sample_ms = round((inference_time_sec / len(X_test)) * 1000, 4)
 
+    # Apply tuned thresholds
     test_pred_binary = np.zeros_like(test_probs, dtype=int)
     for idx, cond in enumerate(TARGET_CONDITIONS):
         th = val_threshold_info[cond]["selected_threshold"]
@@ -336,27 +271,22 @@ def train_and_evaluate_transformer(
             "support_total": int(len(y_true_c))
         }
 
-    # Save Model
-    output_dir = Path(__file__).resolve().parent.parent / "models" / "transformer"
+    # Save Model Weights & Metrics
+    output_dir = Path(__file__).resolve().parent.parent / "models" / "dnn"
     output_dir.mkdir(parents=True, exist_ok=True)
-    model_path = output_dir / "best_transformer.pt"
+    model_path = output_dir / "best_dnn.pt"
     torch.save({
         "model_state_dict": model.state_dict(),
-        "num_numerical": len(NUMERICAL_FEATURES),
-        "categorical_cardinalities": cardinalities,
-        "d_token": d_token,
-        "n_layers": n_layers,
-        "n_heads": n_heads,
-        "d_ffn": d_ffn,
+        "input_dim": len(ALL_FEATURES),
+        "num_targets": len(TARGET_CONDITIONS),
         "dropout": dropout,
-        "n_targets": len(TARGET_CONDITIONS),
         "features": ALL_FEATURES,
         "targets": TARGET_CONDITIONS
     }, model_path)
 
     metrics_payload = {
-        "model_name": "FT-Transformer (Tabular Neural Self-Attention)",
-        "architecture": f"FTTransformer(d_token={d_token}, n_layers={n_layers}, n_heads={n_heads}, d_ffn={d_ffn})",
+        "model_name": "Tabular Deep Neural Network (DNN)",
+        "architecture": "Dense(256)->BN->ReLU->Drop(0.2)->Dense(128)->BN->ReLU->Drop(0.2)->Dense(64)->ReLU->Linear(3)",
         "dataset": "NFHS-5 dhs_clean.parquet (198,849 records)",
         "dataset_split": {
             "train": len(X_train),
@@ -384,14 +314,14 @@ def train_and_evaluate_transformer(
         "target_conditions": TARGET_CONDITIONS
     }
 
-    metrics_path = output_dir / "transformer_metrics.json"
+    metrics_path = output_dir / "dnn_metrics.json"
     with open(metrics_path, "w") as f:
         json.dump(metrics_payload, f, indent=2)
 
-    print(f"\nSaved FT-Transformer model to: {model_path}")
-    print(f"Saved FT-Transformer metrics to: {metrics_path}")
+    print(f"\nSaved DNN model to: {model_path}")
+    print(f"Saved DNN metrics to: {metrics_path}")
 
-    print("\n--- FT-Transformer Test Set Performance Summary ---")
+    print("\n--- DNN Test Set Performance Summary ---")
     print(f"Exact Match Accuracy: {exact_match_acc * 100:.2f}%")
     print(f"Macro F1-Score:       {f1_macro:.4f}")
     print(f"Weighted F1-Score:    {f1_weighted:.4f}")
@@ -405,4 +335,4 @@ def train_and_evaluate_transformer(
 
 
 if __name__ == "__main__":
-    train_and_evaluate_transformer()
+    train_and_evaluate_dnn()

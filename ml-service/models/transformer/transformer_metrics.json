@@ -1,290 +1,133 @@
 {
-  "model_name": "FT-Transformer Tabular Multi-Target Model",
-  "exact_match_accuracy": 0.9405,
-  "hamming_loss": 0.0089,
-  "macro_f1": 0.8396,
-  "weighted_f1": 0.973,
-  "micro_f1": 0.9735,
-  "macro_precision": 0.943,
-  "macro_recall": 0.8209,
-  "macro_roc_auc": 0.999,
-  "training_time_seconds": 537.92,
-  "inference_time_seconds": 1.804,
-  "per_sample_inference_ms": 0.1203,
-  "threshold_info": {
-    "Malnutrition": {
-      "selected_threshold": 0.4,
-      "val_f1": 0.9658,
-      "reason": "Validation F1-score optimization (0.9658)"
-    },
+  "model_name": "FT-Transformer (Tabular Neural Self-Attention)",
+  "architecture": "FTTransformer(d_token=64, n_layers=2, n_heads=4, d_ffn=128)",
+  "dataset": "NFHS-5 dhs_clean.parquet (198,849 records)",
+  "dataset_split": {
+    "train": 50000,
+    "val": 29827,
+    "test": 29828
+  },
+  "training_time_seconds": 156.79,
+  "inference_latency": {
+    "total_test_seconds": 3.6431,
+    "per_sample_ms": 0.1221
+  },
+  "overall_metrics": {
+    "exact_match_accuracy": 0.2096,
+    "hamming_loss": 0.4746,
+    "macro_f1": 0.5221,
+    "macro_precision": 0.3914,
+    "macro_recall": 0.8085,
+    "weighted_f1": 0.5726,
+    "macro_roc_auc": 0.6325
+  },
+  "threshold_calibration": {
     "Stunting": {
-      "selected_threshold": 0.35,
-      "val_f1": 0.9575,
-      "reason": "Validation F1-score optimization (0.9575)"
+      "selected_threshold": 0.4,
+      "val_f1": 0.5593,
+      "reason": "Optimized on validation set to maximize F1-score (0.5593)"
     },
     "Wasting": {
-      "selected_threshold": 0.4,
-      "val_f1": 0.9621,
-      "reason": "Validation F1-score optimization (0.9621)"
-    },
-    "Underweight": {
-      "selected_threshold": 0.6,
-      "val_f1": 0.9808,
-      "reason": "Validation F1-score optimization (0.9808)"
-    },
-    "Overweight/Obesity": {
-      "selected_threshold": 0.6,
-      "val_f1": 0.9934,
-      "reason": "Validation F1-score optimization (0.9934)"
-    },
-    "Anemia": {
-      "selected_threshold": 0.4,
-      "val_f1": 0.9542,
-      "reason": "Validation F1-score optimization (0.9542)"
-    },
-    "Iron Deficiency / Iron Deficiency Anemia": {
-      "selected_threshold": 0.45,
-      "val_f1": 0.9364,
-      "reason": "Validation F1-score optimization (0.9364)"
-    },
-    "Vitamin A Deficiency": {
       "selected_threshold": 0.5,
-      "val_f1": 0.7436,
-      "reason": "Validation F1-score optimization (0.7436)"
+      "val_f1": 0.3363,
+      "reason": "Optimized on validation set to maximize F1-score (0.3363)"
     },
-    "Protein-Energy Malnutrition (PEM)": {
-      "selected_threshold": 0.2,
-      "val_f1": 0.3077,
-      "reason": "Validation F1-score optimization (0.3077)"
-    },
-    "Micronutrient Deficiency Risk": {
-      "selected_threshold": 0.45,
-      "val_f1": 0.9521,
-      "reason": "Validation F1-score optimization (0.9521)"
+    "Malnutrition": {
+      "selected_threshold": 0.35,
+      "val_f1": 0.6746,
+      "reason": "Optimized on validation set to maximize F1-score (0.6746)"
     }
   },
-  "per_class_metrics": {
-    "Malnutrition": {
-      "accuracy": 0.9739,
-      "precision": 0.9639,
-      "recall": 0.9705,
-      "f1_score": 0.9672,
-      "roc_auc": 0.9979,
-      "sensitivity": 0.9705,
-      "specificity": 0.9762,
-      "selected_threshold": 0.4,
-      "positive_count": 5937,
-      "total_count": 15000
-    },
+  "per_condition_metrics": {
     "Stunting": {
-      "accuracy": 0.981,
-      "precision": 0.95,
-      "recall": 0.9646,
-      "f1_score": 0.9573,
-      "roc_auc": 0.9983,
-      "sensitivity": 0.9646,
-      "specificity": 0.9856,
-      "selected_threshold": 0.35,
-      "positive_count": 3309,
-      "total_count": 15000
+      "accuracy": 0.5449,
+      "precision": 0.4281,
+      "recall_sensitivity": 0.791,
+      "specificity": 0.4067,
+      "f1_score": 0.5555,
+      "roc_auc": 0.6535,
+      "optimal_threshold": 0.4,
+      "support_positive": 10725,
+      "support_total": 29828
     },
     "Wasting": {
-      "accuracy": 0.9909,
-      "precision": 0.9457,
-      "recall": 0.9821,
-      "f1_score": 0.9636,
-      "roc_auc": 0.9995,
-      "sensitivity": 0.9821,
-      "specificity": 0.9921,
-      "selected_threshold": 0.4,
-      "positive_count": 1846,
-      "total_count": 15000
+      "accuracy": 0.4885,
+      "precision": 0.2229,
+      "recall_sensitivity": 0.6861,
+      "specificity": 0.4425,
+      "f1_score": 0.3365,
+      "roc_auc": 0.5995,
+      "optimal_threshold": 0.5,
+      "support_positive": 5639,
+      "support_total": 29828
     },
-    "Underweight": {
-      "accuracy": 0.9907,
-      "precision": 0.9773,
-      "recall": 0.9816,
-      "f1_score": 0.9795,
-      "roc_auc": 0.9996,
-      "sensitivity": 0.9816,
-      "specificity": 0.9934,
-      "selected_threshold": 0.6,
-      "positive_count": 3376,
-      "total_count": 15000
-    },
-    "Overweight/Obesity": {
-      "accuracy": 0.9923,
-      "precision": 0.9932,
-      "recall": 0.9929,
-      "f1_score": 0.9931,
-      "roc_auc": 0.9998,
-      "sensitivity": 0.9929,
-      "specificity": 0.9914,
-      "selected_threshold": 0.6,
-      "positive_count": 8366,
-      "total_count": 15000
-    },
-    "Anemia": {
-      "accuracy": 0.994,
-      "precision": 0.952,
-      "recall": 0.9595,
-      "f1_score": 0.9558,
-      "roc_auc": 0.9995,
-      "sensitivity": 0.9595,
-      "specificity": 0.9965,
-      "selected_threshold": 0.4,
-      "positive_count": 1013,
-      "total_count": 15000
-    },
-    "Iron Deficiency / Iron Deficiency Anemia": {
-      "accuracy": 0.9991,
-      "precision": 0.9775,
-      "recall": 0.9457,
-      "f1_score": 0.9613,
-      "roc_auc": 0.9999,
-      "sensitivity": 0.9457,
-      "specificity": 0.9997,
-      "selected_threshold": 0.45,
-      "positive_count": 184,
-      "total_count": 15000
-    },
-    "Vitamin A Deficiency": {
-      "accuracy": 0.9972,
-      "precision": 0.7143,
-      "recall": 0.3704,
-      "f1_score": 0.4878,
-      "roc_auc": 0.9973,
-      "sensitivity": 0.3704,
-      "specificity": 0.9995,
-      "selected_threshold": 0.5,
-      "positive_count": 54,
-      "total_count": 15000
-    },
-    "Protein-Energy Malnutrition (PEM)": {
-      "accuracy": 0.9988,
-      "precision": 1.0,
-      "recall": 0.1,
-      "f1_score": 0.1818,
-      "roc_auc": 0.9988,
-      "sensitivity": 0.1,
-      "specificity": 1.0,
-      "selected_threshold": 0.2,
-      "positive_count": 20,
-      "total_count": 15000
-    },
-    "Micronutrient Deficiency Risk": {
-      "accuracy": 0.9931,
-      "precision": 0.9565,
-      "recall": 0.9416,
-      "f1_score": 0.949,
-      "roc_auc": 0.9995,
-      "sensitivity": 0.9416,
-      "specificity": 0.9969,
-      "selected_threshold": 0.45,
-      "positive_count": 1027,
-      "total_count": 15000
+    "Malnutrition": {
+      "accuracy": 0.5428,
+      "precision": 0.5232,
+      "recall_sensitivity": 0.9485,
+      "specificity": 0.1383,
+      "f1_score": 0.6744,
+      "roc_auc": 0.6446,
+      "optimal_threshold": 0.35,
+      "support_positive": 14891,
+      "support_total": 29828
     }
   },
   "confusion_matrices": {
-    "Malnutrition": [
-      [
-        8847,
-        216
-      ],
-      [
-        175,
-        5762
-      ]
-    ],
     "Stunting": [
       [
-        11523,
-        168
+        7769,
+        11334
       ],
       [
-        117,
-        3192
+        2242,
+        8483
       ]
     ],
     "Wasting": [
       [
-        13050,
-        104
+        10703,
+        13486
       ],
       [
-        33,
-        1813
+        1770,
+        3869
       ]
     ],
-    "Underweight": [
+    "Malnutrition": [
       [
-        11547,
-        77
+        2066,
+        12871
       ],
       [
-        62,
-        3314
-      ]
-    ],
-    "Overweight/Obesity": [
-      [
-        6577,
-        57
-      ],
-      [
-        59,
-        8307
-      ]
-    ],
-    "Anemia": [
-      [
-        13938,
-        49
-      ],
-      [
-        41,
-        972
-      ]
-    ],
-    "Iron Deficiency / Iron Deficiency Anemia": [
-      [
-        14812,
-        4
-      ],
-      [
-        10,
-        174
-      ]
-    ],
-    "Vitamin A Deficiency": [
-      [
-        14938,
-        8
-      ],
-      [
-        34,
-        20
-      ]
-    ],
-    "Protein-Energy Malnutrition (PEM)": [
-      [
-        14980,
-        0
-      ],
-      [
-        18,
-        2
-      ]
-    ],
-    "Micronutrient Deficiency Risk": [
-      [
-        13929,
-        44
-      ],
-      [
-        60,
-        967
+        767,
+        14124
       ]
     ]
-  }
+  },
+  "features_used": [
+    "child_age_months",
+    "birth_weight",
+    "breastfeeding_duration",
+    "birth_order",
+    "mother_bmi",
+    "anc_visits",
+    "hhsize",
+    "sanitation_risk_index",
+    "maternal_risk_score",
+    "child_sex",
+    "education",
+    "wealth_quintile",
+    "residence",
+    "birth_size",
+    "diarrhea_recent",
+    "fever_recent",
+    "cough_recent",
+    "measles_vaccine"
+  ],
+  "target_conditions": [
+    "Stunting",
+    "Wasting",
+    "Malnutrition"
+  ]
 }

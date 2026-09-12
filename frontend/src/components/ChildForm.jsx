@@ -1,55 +1,96 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, Cpu, Sparkles, AlertCircle, Calculator, ChevronRight } from 'lucide-react';
+import { Activity, Cpu, Sparkles, AlertCircle, ShieldAlert, User, Heart, Home, Stethoscope } from 'lucide-react';
 
 export default function ChildForm({ onSubmit, loading, selectedModel, setSelectedModel }) {
   const [formData, setFormData] = useState({
     childName: 'Child #1042',
-    age_months: '24',
-    gender: 'Female',
-    height_cm: '85.0',
-    weight_kg: '11.5',
-    muac_cm: '14.0',
-    dietary_diversity: '4',
-    meal_frequency: '3',
-    breastfeeding_status: 'Partial',
-    water_sanitation_index: '4'
-  });
-
-  const [derived, setDerived] = useState({
-    bmi: 0,
-    haz: 0,
-    waz: 0,
-    whz: 0
+    child_age_months: '24',
+    child_sex: 'Female',
+    birth_weight: '2.9',
+    birth_size: 'Average',
+    breastfeeding_duration: '18',
+    birth_order: '2',
+    mother_bmi: '21.5',
+    education: 'Secondary',
+    anc_visits: '5',
+    wealth_quintile: 'Middle',
+    residence: 'Rural',
+    hhsize: '5',
+    sanitation_risk_index: '1',
+    diarrhea_recent: 'No',
+    fever_recent: 'No',
+    cough_recent: 'No',
+    measles_vaccine: 'Yes'
   });
 
   const [errors, setErrors] = useState({});
 
-  // Auto-calculate derived indicators (BMI, Z-scores) dynamically
-  useEffect(() => {
-    const age = parseFloat(formData.age_months) || 0;
-    const h = parseFloat(formData.height_cm) || 0;
-    const w = parseFloat(formData.weight_kg) || 0;
-
-    if (h > 0 && w > 0) {
-      const h_m = h / 100;
-      const bmiVal = (w / (h_m * h_m)).toFixed(2);
-
-      const expH = 50.0 + 0.75 * age;
-      const expW = 3.3 + 0.25 * age + 0.002 * (age * age);
-      const expWH = 0.15 * h - 4.5;
-
-      const hazVal = ((h - expH) / (3.5 + 0.02 * age)).toFixed(2);
-      const wazVal = ((w - expW) / (0.8 + 0.05 * age)).toFixed(2);
-      const whzVal = ((w - expWH) / (1.0 + 0.02 * (h / 10))).toFixed(2);
-
-      setDerived({
-        bmi: bmiVal,
-        haz: hazVal,
-        waz: wazVal,
-        whz: whzVal
+  const applyPreset = (type) => {
+    if (type === 'high_risk') {
+      setFormData({
+        childName: 'Priya (High-Risk Screening)',
+        child_age_months: '18',
+        child_sex: 'Female',
+        birth_weight: '2.1',
+        birth_size: 'Smaller than Average',
+        breastfeeding_duration: '8',
+        birth_order: '4',
+        mother_bmi: '17.2',
+        education: 'No Education',
+        anc_visits: '1',
+        wealth_quintile: 'Poorest',
+        residence: 'Rural',
+        hhsize: '7',
+        sanitation_risk_index: '3',
+        diarrhea_recent: 'Yes',
+        fever_recent: 'Yes',
+        cough_recent: 'Yes',
+        measles_vaccine: 'No'
+      });
+    } else if (type === 'low_risk') {
+      setFormData({
+        childName: 'Aarav (Healthy Baseline)',
+        child_age_months: '24',
+        child_sex: 'Male',
+        birth_weight: '3.3',
+        birth_size: 'Average',
+        breastfeeding_duration: '20',
+        birth_order: '1',
+        mother_bmi: '23.8',
+        education: 'Higher',
+        anc_visits: '8',
+        wealth_quintile: 'Richest',
+        residence: 'Urban',
+        hhsize: '4',
+        sanitation_risk_index: '0',
+        diarrhea_recent: 'No',
+        fever_recent: 'No',
+        cough_recent: 'No',
+        measles_vaccine: 'Yes'
+      });
+    } else if (type === 'moderate_risk') {
+      setFormData({
+        childName: 'Kavya (Borderline Profile)',
+        child_age_months: '14',
+        child_sex: 'Female',
+        birth_weight: '2.6',
+        birth_size: 'Average',
+        breastfeeding_duration: '12',
+        birth_order: '2',
+        mother_bmi: '19.4',
+        education: 'Primary',
+        anc_visits: '3',
+        wealth_quintile: 'Poorer',
+        residence: 'Rural',
+        hhsize: '6',
+        sanitation_risk_index: '2',
+        diarrhea_recent: 'No',
+        fever_recent: 'Yes',
+        cough_recent: 'No',
+        measles_vaccine: 'Yes'
       });
     }
-  }, [formData.age_months, formData.height_cm, formData.weight_kg]);
+  };
 
   const handleChange = (field, val) => {
     setFormData(prev => ({ ...prev, [field]: val }));
@@ -60,15 +101,13 @@ export default function ChildForm({ onSubmit, loading, selectedModel, setSelecte
 
   const validate = () => {
     const errs = {};
-    const age = parseFloat(formData.age_months);
-    const h = parseFloat(formData.height_cm);
-    const w = parseFloat(formData.weight_kg);
-    const muac = parseFloat(formData.muac_cm);
+    const age = parseFloat(formData.child_age_months);
+    const bw = parseFloat(formData.birth_weight);
+    const mbmi = parseFloat(formData.mother_bmi);
 
-    if (isNaN(age) || age < 0 || age > 120) errs.age_months = 'Age must be between 0 and 120 months.';
-    if (isNaN(h) || h < 30 || h > 200) errs.height_cm = 'Height must be between 30 and 200 cm.';
-    if (isNaN(w) || w < 1 || w > 100) errs.weight_kg = 'Weight must be between 1 and 100 kg.';
-    if (isNaN(muac) || muac < 5 || muac > 25) errs.muac_cm = 'MUAC must be between 5 and 25 cm.';
+    if (isNaN(age) || age < 0 || age > 60) errs.child_age_months = 'Age must be 0–60 months.';
+    if (isNaN(bw) || bw < 0.5 || bw > 6.0) errs.birth_weight = 'Birth weight must be between 0.5 and 6.0 kg.';
+    if (isNaN(mbmi) || mbmi < 10 || mbmi > 55) errs.mother_bmi = 'Mother BMI must be between 10 and 55.';
 
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -80,274 +119,361 @@ export default function ChildForm({ onSubmit, loading, selectedModel, setSelecte
 
     onSubmit({
       ...formData,
-      age_months: parseFloat(formData.age_months),
-      height_cm: parseFloat(formData.height_cm),
-      weight_kg: parseFloat(formData.weight_kg),
-      muac_cm: parseFloat(formData.muac_cm),
-      dietary_diversity: parseInt(formData.dietary_diversity, 10),
-      meal_frequency: parseInt(formData.meal_frequency, 10),
-      water_sanitation_index: parseInt(formData.water_sanitation_index, 10),
-      bmi: parseFloat(derived.bmi),
-      haz: parseFloat(derived.haz),
-      waz: parseFloat(derived.waz),
-      whz: parseFloat(derived.whz)
+      child_age_months: parseFloat(formData.child_age_months),
+      birth_weight: parseFloat(formData.birth_weight),
+      breastfeeding_duration: parseFloat(formData.breastfeeding_duration),
+      birth_order: parseFloat(formData.birth_order),
+      mother_bmi: parseFloat(formData.mother_bmi),
+      anc_visits: parseFloat(formData.anc_visits),
+      hhsize: parseFloat(formData.hhsize),
+      sanitation_risk_index: parseFloat(formData.sanitation_risk_index)
     });
   };
 
+  const modelsList = ['Compare All', 'XGBoost', 'Transformer', 'DNN', 'TabNet'];
+
   return (
     <form onSubmit={handleSubmit} className="glass-panel" style={{ padding: '2rem' }}>
+      {/* Header & Model Selector */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h2 style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--text-primary)' }}>
-            Child Health Assessment Details
+          <h2 style={{ fontSize: '1.4rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <Activity color="#6366f1" />
+            Pediatric Intake & Survey Indicators
           </h2>
-          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-            Enter anthropometric and nutritional metrics for multi-disease AI screening.
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+            Enter DHS/ICDS indicators to screen for Stunting, Wasting, and Malnutrition risk.
           </p>
         </div>
 
-        {/* Model Selection Toggle */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.05)', padding: '0.35rem 0.5rem', borderRadius: '999px', border: '1px solid var(--border-color)' }}>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', paddingLeft: '0.5rem', fontWeight: 600 }}>
-            Model Engine:
-          </span>
+        {/* Preset Case Buttons */}
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           <button
             type="button"
-            className={`nav-tab-btn ${selectedModel === 'Compare Both' ? 'active' : ''}`}
-            onClick={() => setSelectedModel('Compare Both')}
-            style={{ fontSize: '0.8rem', padding: '0.35rem 0.85rem' }}
+            className="btn btn-outline"
+            style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', borderColor: '#ef4444', color: '#ef4444' }}
+            onClick={() => applyPreset('high_risk')}
           >
-            <Sparkles size={14} style={{ display: 'inline', marginRight: '0.35rem' }} />
-            Compare Both (Dual Model)
+            🔴 Preset: High-Risk
           </button>
           <button
             type="button"
-            className={`nav-tab-btn ${selectedModel === 'FT-Transformer' ? 'active' : ''}`}
-            onClick={() => setSelectedModel('FT-Transformer')}
-            style={{ fontSize: '0.8rem', padding: '0.35rem 0.85rem' }}
+            className="btn btn-outline"
+            style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', borderColor: '#eab308', color: '#eab308' }}
+            onClick={() => applyPreset('moderate_risk')}
           >
-            <Cpu size={14} style={{ display: 'inline', marginRight: '0.35rem' }} />
-            FT-Transformer
+            🟡 Preset: Borderline
           </button>
           <button
             type="button"
-            className={`nav-tab-btn ${selectedModel === 'XGBoost' ? 'active' : ''}`}
-            onClick={() => setSelectedModel('XGBoost')}
-            style={{ fontSize: '0.8rem', padding: '0.35rem 0.85rem' }}
+            className="btn btn-outline"
+            style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', borderColor: '#22c55e', color: '#22c55e' }}
+            onClick={() => applyPreset('low_risk')}
           >
-            <Activity size={14} style={{ display: 'inline', marginRight: '0.35rem' }} />
-            XGBoost Baseline
+            🟢 Preset: Healthy
           </button>
         </div>
       </div>
 
-      {/* Section 1: Child Information */}
-      <div style={{ marginBottom: '1.75rem' }}>
-        <h3 style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--accent-teal)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          Section 1 — Child Identification
-        </h3>
-        <div className="form-grid">
-          <div className="form-group">
-            <label className="form-label">Child ID / Name</label>
-            <div className="input-wrapper">
-              <input
-                type="text"
-                className="form-input"
-                value={formData.childName}
-                onChange={e => handleChange('childName', e.target.value)}
-                placeholder="e.g. Child #1042"
-              />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">
-              Age (Months) <span style={{ color: 'var(--risk-high)' }}>*</span>
-            </label>
-            <div className="input-wrapper">
-              <input
-                type="number"
-                step="0.1"
-                className={`form-input ${errors.age_months ? 'error' : ''}`}
-                value={formData.age_months}
-                onChange={e => handleChange('age_months', e.target.value)}
-                placeholder="0 - 120"
-              />
-              <span className="input-unit">months</span>
-            </div>
-            {errors.age_months && <span className="error-text">{errors.age_months}</span>}
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Gender / Sex</label>
-            <select
-              className="form-select"
-              value={formData.gender}
-              onChange={e => handleChange('gender', e.target.value)}
+      {/* Model Selection Tabs */}
+      <div style={{ marginBottom: '2rem', padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '0.6rem' }}>
+          Selected AI Screening Model:
+        </span>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          {modelsList.map(m => (
+            <button
+              key={m}
+              type="button"
+              className={`btn ${selectedModel === m ? 'btn-primary' : 'btn-outline'}`}
+              style={{ padding: '0.4rem 1rem', fontSize: '0.85rem' }}
+              onClick={() => setSelectedModel(m)}
             >
-              <option value="Female">Female</option>
-              <option value="Male">Male</option>
-            </select>
-          </div>
+              {m === 'Compare All' && <Sparkles size={14} style={{ marginRight: '0.3rem', display: 'inline' }} />}
+              {m}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Section 2: Growth Measurements */}
-      <div style={{ marginBottom: '1.75rem' }}>
-        <h3 style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--accent-teal)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          Section 2 — Growth & Anthropometric Measurements
-        </h3>
+      {/* 4 Thematic Form Grid Sections */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+        
+        {/* Section 1: Child Demographic & Birth */}
+        <div className="glass-panel" style={{ padding: '1.25rem', background: 'rgba(255,255,255,0.02)' }}>
+          <h3 style={{ fontSize: '0.95rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#818cf8', marginBottom: '1rem' }}>
+            <User size={16} /> Child Profile & Birth Metrics
+          </h3>
 
-        {/* Derived Z-Scores & BMI Ribbon */}
-        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', background: 'rgba(99, 102, 241, 0.08)', padding: '0.85rem 1.25rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(99, 102, 241, 0.2)', marginBottom: '1.25rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Calculator size={16} color="var(--accent-primary)" />
-            <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#a5b4fc' }}>Calculated Indicators:</span>
+          <div className="form-group" style={{ marginBottom: '0.85rem' }}>
+            <label className="form-label">Child Name / ID</label>
+            <input
+              type="text"
+              className="form-control"
+              value={formData.childName}
+              onChange={(e) => handleChange('childName', e.target.value)}
+            />
           </div>
-          <span className="calc-badge">BMI: {derived.bmi} kg/m²</span>
-          <span className="calc-badge">HAZ (Height-for-Age): {derived.haz}</span>
-          <span className="calc-badge">WAZ (Weight-for-Age): {derived.waz}</span>
-          <span className="calc-badge">WHZ (Weight-for-Height): {derived.whz}</span>
-        </div>
 
-        <div className="form-grid">
-          <div className="form-group">
-            <label className="form-label">
-              Height <span style={{ color: 'var(--risk-high)' }}>*</span>
-            </label>
-            <div className="input-wrapper">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.85rem' }}>
+            <div className="form-group">
+              <label className="form-label">Age (months)</label>
+              <input
+                type="number"
+                className="form-control"
+                value={formData.child_age_months}
+                onChange={(e) => handleChange('child_age_months', e.target.value)}
+              />
+              {errors.child_age_months && <span style={{ color: '#ef4444', fontSize: '0.75rem' }}>{errors.child_age_months}</span>}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Sex</label>
+              <select
+                className="form-control"
+                value={formData.child_sex}
+                onChange={(e) => handleChange('child_sex', e.target.value)}
+              >
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.85rem' }}>
+            <div className="form-group">
+              <label className="form-label">Birth Weight (kg)</label>
               <input
                 type="number"
                 step="0.1"
-                className={`form-input ${errors.height_cm ? 'error' : ''}`}
-                value={formData.height_cm}
-                onChange={e => handleChange('height_cm', e.target.value)}
-                placeholder="30 - 200"
+                className="form-control"
+                value={formData.birth_weight}
+                onChange={(e) => handleChange('birth_weight', e.target.value)}
               />
-              <span className="input-unit">cm</span>
+              {errors.birth_weight && <span style={{ color: '#ef4444', fontSize: '0.75rem' }}>{errors.birth_weight}</span>}
             </div>
-            {errors.height_cm && <span className="error-text">{errors.height_cm}</span>}
+
+            <div className="form-group">
+              <label className="form-label">Birth Size</label>
+              <select
+                className="form-control"
+                value={formData.birth_size}
+                onChange={(e) => handleChange('birth_size', e.target.value)}
+              >
+                <option value="Very Large">Very Large</option>
+                <option value="Larger than Average">Larger than Avg</option>
+                <option value="Average">Average</option>
+                <option value="Smaller than Average">Smaller than Avg</option>
+                <option value="Very Small">Very Small</option>
+              </select>
+            </div>
           </div>
 
-          <div className="form-group">
-            <label className="form-label">
-              Weight <span style={{ color: 'var(--risk-high)' }}>*</span>
-            </label>
-            <div className="input-wrapper">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <div className="form-group">
+              <label className="form-label">Breastfeeding (mo)</label>
               <input
                 type="number"
-                step="0.1"
-                className={`form-input ${errors.weight_kg ? 'error' : ''}`}
-                value={formData.weight_kg}
-                onChange={e => handleChange('weight_kg', e.target.value)}
-                placeholder="1 - 100"
+                className="form-control"
+                value={formData.breastfeeding_duration}
+                onChange={(e) => handleChange('breastfeeding_duration', e.target.value)}
               />
-              <span className="input-unit">kg</span>
             </div>
-            {errors.weight_kg && <span className="error-text">{errors.weight_kg}</span>}
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">
-              MUAC (Arm Circumference) <span style={{ color: 'var(--risk-high)' }}>*</span>
-            </label>
-            <div className="input-wrapper">
+            <div className="form-group">
+              <label className="form-label">Birth Order</label>
               <input
                 type="number"
-                step="0.1"
-                className={`form-input ${errors.muac_cm ? 'error' : ''}`}
-                value={formData.muac_cm}
-                onChange={e => handleChange('muac_cm', e.target.value)}
-                placeholder="8.0 - 20.0"
+                className="form-control"
+                value={formData.birth_order}
+                onChange={(e) => handleChange('birth_order', e.target.value)}
               />
-              <span className="input-unit">cm</span>
             </div>
-            {errors.muac_cm && <span className="error-text">{errors.muac_cm}</span>}
           </div>
         </div>
-      </div>
 
-      {/* Section 3: Nutrition & Health */}
-      <div style={{ marginBottom: '2rem' }}>
-        <h3 style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--accent-teal)', marginBottom: '1rem' }}>
-          Section 3 — Nutrition & Health Indicators
-        </h3>
-        <div className="form-grid">
-          <div className="form-group">
-            <label className="form-label">Dietary Diversity Score (1 - 7)</label>
+        {/* Section 2: Maternal Health & Nutrition */}
+        <div className="glass-panel" style={{ padding: '1.25rem', background: 'rgba(255,255,255,0.02)' }}>
+          <h3 style={{ fontSize: '0.95rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#ec4899', marginBottom: '1rem' }}>
+            <Heart size={16} /> Maternal Health & Care
+          </h3>
+
+          <div className="form-group" style={{ marginBottom: '0.85rem' }}>
+            <label className="form-label">Mother's BMI (kg/m²)</label>
+            <input
+              type="number"
+              step="0.1"
+              className="form-control"
+              value={formData.mother_bmi}
+              onChange={(e) => handleChange('mother_bmi', e.target.value)}
+            />
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Normal: 18.5–24.9 | Underweight: &lt; 18.5</span>
+            {errors.mother_bmi && <span style={{ color: '#ef4444', fontSize: '0.75rem' }}>{errors.mother_bmi}</span>}
+          </div>
+
+          <div className="form-group" style={{ marginBottom: '0.85rem' }}>
+            <label className="form-label">Mother's Education</label>
             <select
-              className="form-select"
-              value={formData.dietary_diversity}
-              onChange={e => handleChange('dietary_diversity', e.target.value)}
+              className="form-control"
+              value={formData.education}
+              onChange={(e) => handleChange('education', e.target.value)}
             >
-              <option value="1">1 - Very Low (1 food group)</option>
-              <option value="2">2 - Low (2 food groups)</option>
-              <option value="3">3 - Moderate (3 food groups)</option>
-              <option value="4">4 - Adequate (4 food groups)</option>
-              <option value="5">5 - Good (5 food groups)</option>
-              <option value="6">6 - High (6 food groups)</option>
-              <option value="7">7 - Optimal (7 food groups)</option>
+              <option value="No Education">No Education</option>
+              <option value="Primary">Primary Education</option>
+              <option value="Secondary">Secondary Education</option>
+              <option value="Higher">Higher Education</option>
             </select>
           </div>
 
           <div className="form-group">
-            <label className="form-label">Daily Meal Frequency</label>
+            <label className="form-label">Antenatal Care (ANC) Visits</label>
+            <input
+              type="number"
+              className="form-control"
+              value={formData.anc_visits}
+              onChange={(e) => handleChange('anc_visits', e.target.value)}
+            />
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>WHO Recommendation: ≥ 4 visits</span>
+          </div>
+        </div>
+
+        {/* Section 3: Household & Environment */}
+        <div className="glass-panel" style={{ padding: '1.25rem', background: 'rgba(255,255,255,0.02)' }}>
+          <h3 style={{ fontSize: '0.95rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#06b6d4', marginBottom: '1rem' }}>
+            <Home size={16} /> Household & Living Setting
+          </h3>
+
+          <div className="form-group" style={{ marginBottom: '0.85rem' }}>
+            <label className="form-label">Wealth Quintile</label>
             <select
-              className="form-select"
-              value={formData.meal_frequency}
-              onChange={e => handleChange('meal_frequency', e.target.value)}
+              className="form-control"
+              value={formData.wealth_quintile}
+              onChange={(e) => handleChange('wealth_quintile', e.target.value)}
             >
-              <option value="1">1 meal per day</option>
-              <option value="2">2 meals per day</option>
-              <option value="3">3 meals per day</option>
-              <option value="4">4 meals per day</option>
-              <option value="5">5+ meals per day</option>
+              <option value="Poorest">Poorest (Lowest 20%)</option>
+              <option value="Poorer">Poorer</option>
+              <option value="Middle">Middle (Median)</option>
+              <option value="Richer">Richer</option>
+              <option value="Richest">Richest (Top 20%)</option>
             </select>
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Breastfeeding Status</label>
-            <select
-              className="form-select"
-              value={formData.breastfeeding_status}
-              onChange={e => handleChange('breastfeeding_status', e.target.value)}
-            >
-              <option value="Exclusive">Exclusive Breastfeeding</option>
-              <option value="Partial">Partial Breastfeeding</option>
-              <option value="Weaned">Weaned / Solid Foods</option>
-            </select>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.85rem' }}>
+            <div className="form-group">
+              <label className="form-label">Residence</label>
+              <select
+                className="form-control"
+                value={formData.residence}
+                onChange={(e) => handleChange('residence', e.target.value)}
+              >
+                <option value="Rural">Rural</option>
+                <option value="Urban">Urban</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Household Size</label>
+              <input
+                type="number"
+                className="form-control"
+                value={formData.hhsize}
+                onChange={(e) => handleChange('hhsize', e.target.value)}
+              />
+            </div>
           </div>
 
           <div className="form-group">
-            <label className="form-label">Water & Sanitation Index (1 - 5)</label>
+            <label className="form-label">Sanitation Risk (0–3)</label>
             <select
-              className="form-select"
-              value={formData.water_sanitation_index}
-              onChange={e => handleChange('water_sanitation_index', e.target.value)}
+              className="form-control"
+              value={formData.sanitation_risk_index}
+              onChange={(e) => handleChange('sanitation_risk_index', e.target.value)}
             >
-              <option value="1">1 - Poor Sanitation / Unimproved</option>
-              <option value="2">2 - Limited Sanitation</option>
-              <option value="3">3 - Basic Access</option>
-              <option value="4">4 - Good Sanitation</option>
-              <option value="5">5 - Safely Managed Water & Sanitation</option>
+              <option value="0">0 — Safe Water, Improved Toilet & Clean Fuel</option>
+              <option value="1">1 — Mild Deficit (e.g. Solid Cooking Fuel)</option>
+              <option value="2">2 — Moderate Deficit (Unsafe Water / Unimproved Toilet)</option>
+              <option value="3">3 — Severe Deficit (Unsafe Water, Open Defecation, Biomass)</option>
             </select>
           </div>
         </div>
+
+        {/* Section 4: Morbidity & Symptoms */}
+        <div className="glass-panel" style={{ padding: '1.25rem', background: 'rgba(255,255,255,0.02)' }}>
+          <h3 style={{ fontSize: '0.95rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#10b981', marginBottom: '1rem' }}>
+            <Stethoscope size={16} /> Child Morbidity Symptoms
+          </h3>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.85rem' }}>
+            <div className="form-group">
+              <label className="form-label">Recent Diarrhea</label>
+              <select
+                className="form-control"
+                value={formData.diarrhea_recent}
+                onChange={(e) => handleChange('diarrhea_recent', e.target.value)}
+              >
+                <option value="No">No</option>
+                <option value="Yes">Yes</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Recent Fever</label>
+              <select
+                className="form-control"
+                value={formData.fever_recent}
+                onChange={(e) => handleChange('fever_recent', e.target.value)}
+              >
+                <option value="No">No</option>
+                <option value="Yes">Yes</option>
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <div className="form-group">
+              <label className="form-label">Recent Cough</label>
+              <select
+                className="form-control"
+                value={formData.cough_recent}
+                onChange={(e) => handleChange('cough_recent', e.target.value)}
+              >
+                <option value="No">No</option>
+                <option value="Yes">Yes</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Measles Vaccine</label>
+              <select
+                className="form-control"
+                value={formData.measles_vaccine}
+                onChange={(e) => handleChange('measles_vaccine', e.target.value)}
+              >
+                <option value="Yes">Yes (Vaccinated)</option>
+                <option value="No">No (Unvaccinated)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       {/* Submit Button */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button type="submit" className="btn-primary" disabled={loading}>
+      <div style={{ textAlign: 'right' }}>
+        <button
+          type="submit"
+          disabled={loading}
+          className="btn btn-primary"
+          style={{ padding: '0.75rem 2rem', fontSize: '1rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+        >
           {loading ? (
             <>
-              <Sparkles size={18} className="spin" />
-              Running AI Multi-Disease Screening...
+              <Cpu className="animate-spin" size={18} />
+              Evaluating 4-Model Suite...
             </>
           ) : (
             <>
               <Sparkles size={18} />
-              Run AI Assessment ({selectedModel})
-              <ChevronRight size={18} />
+              Screen Malnutrition Risk ({selectedModel})
             </>
           )}
         </button>

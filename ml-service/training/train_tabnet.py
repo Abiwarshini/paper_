@@ -3,14 +3,13 @@ import sys
 import time
 import json
 from pathlib import Path
-import joblib
 import numpy as np
 import pandas as pd
-from xgboost import XGBClassifier
-from sklearn.multioutput import MultiOutputClassifier
+import torch
+from pytorch_tabnet.multitask import TabNetMultiTaskClassifier
 from sklearn.metrics import (
     accuracy_score, precision_recall_fscore_support, roc_auc_score,
-    confusion_matrix, hamming_loss, classification_report
+    confusion_matrix, hamming_loss
 )
 
 # Add parent directory to path
@@ -23,15 +22,15 @@ from preprocessing.preprocessing import (
 def tune_thresholds_on_val(model, X_val, Y_val):
     """
     Select optimal probability threshold per target condition on Validation set.
-    Evaluates candidate thresholds [0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60]
-    to maximize validation F1-score while preserving specificity.
     """
-    val_probs = np.array([est.predict_proba(X_val[ALL_FEATURES])[:, 1] for est in model.estimators_]).T
+    val_probs_raw = model.predict_proba(X_val)
+    val_probs = np.column_stack([p[:, 1] for p in val_probs_raw])
+
     thresholds = {}
     candidate_th = [0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60]
 
     for idx, cond in enumerate(TARGET_CONDITIONS):
-        y_true = Y_val.iloc[:, idx].values
+        y_true = Y_val[:, idx]
         probs = val_probs[:, idx]
 
         best_th = 0.50
@@ -53,58 +52,92 @@ def tune_thresholds_on_val(model, X_val, Y_val):
     return thresholds, val_probs
 
 
-def train_and_evaluate_xgboost(random_state=42):
-    print("=== Training XGBoost Baseline on Real DHS Dataset (dhs_clean.parquet) ===")
-    start_time = time.time()
+def train_and_evaluate_tabnet(
+    n_d=16,
+    n_a=16,
+    n_steps=4,
+    gamma=1.3,
+    lambda_sparse=1e-4,
+    learning_rate=2e-2,
+    batch_size=1024,
+    virtual_batch_size=128,
+    max_epochs=15,
+    patience=5,
+    random_state=42
+):
+    print("=== Training TabNet Multi-Task Classifier on DHS Dataset ===")
+    torch.manual_seed(random_state)
+    np.random.seed(random_state)
 
+    start_time = time.time()
     (X_train, Y_train), (X_val, Y_val), (X_test, Y_test), preprocessor = prepare_data_splits(random_state=random_state)
 
-    # Base XGBoost with tuned hyperparameters
-    base_xgb = XGBClassifier(
-        n_estimators=150,
-        max_depth=6,
-        learning_rate=0.08,
-        subsample=0.85,
-        colsample_bytree=0.85,
-        random_state=random_state,
-        n_jobs=-1,
-        eval_metric="logloss"
+    X_train_np = X_train[ALL_FEATURES].values.astype(np.float32)
+    Y_train_np = Y_train[TARGET_CONDITIONS].values.astype(int)
+
+    X_val_np = X_val[ALL_FEATURES].values.astype(np.float32)
+    Y_val_np = Y_val[TARGET_CONDITIONS].values.astype(int)
+
+    X_test_np = X_test[ALL_FEATURES].values.astype(np.float32)
+    Y_test_np = Y_test[TARGET_CONDITIONS].values.astype(int)
+
+    model = TabNetMultiTaskClassifier(
+        n_d=n_d,
+        n_a=n_a,
+        n_steps=n_steps,
+        gamma=gamma,
+        lambda_sparse=lambda_sparse,
+        optimizer_fn=torch.optim.AdamW,
+        optimizer_params=dict(lr=learning_rate, weight_decay=1e-4),
+        scheduler_fn=torch.optim.lr_scheduler.StepLR,
+        scheduler_params=dict(step_size=4, gamma=0.5),
+        seed=random_state,
+        verbose=1
     )
 
-    model = MultiOutputClassifier(base_xgb, n_jobs=-1)
-
-    print(f"Fitting XGBoost across {len(TARGET_CONDITIONS)} conditions on train set ({len(X_train):,} samples)...")
+    print(f"\nFitting TabNet (Train: {len(X_train_np):,}, Val: {len(X_val_np):,})...")
     train_start = time.time()
-    model.fit(X_train[ALL_FEATURES], Y_train)
+
+    model.fit(
+        X_train=X_train_np,
+        y_train=Y_train_np,
+        eval_set=[(X_val_np, Y_val_np)],
+        eval_name=["val"],
+        max_epochs=max_epochs,
+        patience=patience,
+        batch_size=batch_size,
+        virtual_batch_size=virtual_batch_size,
+        drop_last=False
+    )
+
     training_time_sec = round(time.time() - train_start, 2)
-    print(f"XGBoost training completed in {training_time_sec} seconds!")
+    print(f"TabNet training completed in {training_time_sec} seconds!")
 
-    # Threshold selection on validation set
-    print("Calibrating validation thresholds for each condition...")
-    val_threshold_info, _ = tune_thresholds_on_val(model, X_val, Y_val)
+    # Threshold calibration on validation set
+    val_threshold_info, _ = tune_thresholds_on_val(model, X_val_np, Y_val_np)
 
-    # Test Set Inference Timing
+    # Test Set Inference
     test_start = time.time()
-    y_pred_probs = np.array([est.predict_proba(X_test[ALL_FEATURES])[:, 1] for est in model.estimators_]).T
+    test_probs_raw = model.predict_proba(X_test_np)
+    test_probs = np.column_stack([p[:, 1] for p in test_probs_raw])
     inference_time_sec = round(time.time() - test_start, 4)
-    per_sample_inference_ms = round((inference_time_sec / len(X_test)) * 1000, 4)
+    per_sample_ms = round((inference_time_sec / len(X_test_np)) * 1000, 4)
 
-    # Apply tuned thresholds for final binary classification
-    y_pred_binary = np.zeros_like(y_pred_probs, dtype=int)
+    # Apply tuned thresholds
+    test_pred_binary = np.zeros_like(test_probs, dtype=int)
     for idx, cond in enumerate(TARGET_CONDITIONS):
         th = val_threshold_info[cond]["selected_threshold"]
-        y_pred_binary[:, idx] = (y_pred_probs[:, idx] >= th).astype(int)
+        test_pred_binary[:, idx] = (test_probs[:, idx] >= th).astype(int)
 
     # Overall Metrics
-    exact_match_acc = accuracy_score(Y_test, y_pred_binary)
-    h_loss = hamming_loss(Y_test, y_pred_binary)
+    exact_match_acc = accuracy_score(Y_test_np, test_pred_binary)
+    h_loss = hamming_loss(Y_test_np, test_pred_binary)
 
-    prec_macro, rec_macro, f1_macro, _ = precision_recall_fscore_support(Y_test, y_pred_binary, average="macro", zero_division=0)
-    prec_weighted, rec_weighted, f1_weighted, _ = precision_recall_fscore_support(Y_test, y_pred_binary, average="weighted", zero_division=0)
-    prec_micro, rec_micro, f1_micro, _ = precision_recall_fscore_support(Y_test, y_pred_binary, average="micro", zero_division=0)
+    prec_macro, rec_macro, f1_macro, _ = precision_recall_fscore_support(Y_test_np, test_pred_binary, average="macro", zero_division=0)
+    prec_weighted, rec_weighted, f1_weighted, _ = precision_recall_fscore_support(Y_test_np, test_pred_binary, average="weighted", zero_division=0)
 
     try:
-        roc_auc_macro = roc_auc_score(Y_test, y_pred_probs, average="macro")
+        roc_auc_macro = roc_auc_score(Y_test_np, test_probs, average="macro")
     except Exception:
         roc_auc_macro = 0.0
 
@@ -112,9 +145,9 @@ def train_and_evaluate_xgboost(random_state=42):
     confusion_matrices = {}
 
     for idx, cond in enumerate(TARGET_CONDITIONS):
-        y_true_c = Y_test.iloc[:, idx].values
-        y_pred_c = y_pred_binary[:, idx]
-        y_prob_c = y_pred_probs[:, idx]
+        y_true_c = Y_test_np[:, idx]
+        y_pred_c = test_pred_binary[:, idx]
+        y_prob_c = test_probs[:, idx]
 
         p, r, f1, _ = precision_recall_fscore_support(y_true_c, y_pred_c, average="binary", zero_division=0)
         acc_c = accuracy_score(y_true_c, y_pred_c)
@@ -126,16 +159,15 @@ def train_and_evaluate_xgboost(random_state=42):
 
         cm = confusion_matrix(y_true_c, y_pred_c)
         tn, fp, fn, tp = cm.ravel() if cm.size == 4 else (0, 0, 0, 0)
-        sensitivity = float(tp / (tp + fn)) if (tp + fn) > 0 else 0.0
-        specificity = float(tn / (tn + fp)) if (tn + fp) > 0 else 0.0
+        sens = float(tp / (tp + fn)) if (tp + fn) > 0 else 0.0
+        spec = float(tn / (tn + fp)) if (tn + fp) > 0 else 0.0
 
         confusion_matrices[cond] = cm.tolist()
-
         per_class_metrics[cond] = {
             "accuracy": round(float(acc_c), 4),
             "precision": round(float(p), 4),
-            "recall_sensitivity": round(float(sensitivity), 4),
-            "specificity": round(float(specificity), 4),
+            "recall_sensitivity": round(float(sens), 4),
+            "specificity": round(float(spec), 4),
             "f1_score": round(float(f1), 4),
             "roc_auc": round(float(auc_c), 4),
             "optimal_threshold": val_threshold_info[cond]["selected_threshold"],
@@ -143,14 +175,15 @@ def train_and_evaluate_xgboost(random_state=42):
             "support_total": int(len(y_true_c))
         }
 
-    # Save Model Artifacts
-    output_dir = Path(__file__).resolve().parent.parent / "models" / "xgboost"
+    # Save TabNet Model
+    output_dir = Path(__file__).resolve().parent.parent / "models" / "tabnet"
     output_dir.mkdir(parents=True, exist_ok=True)
-    model_path = output_dir / "xgboost_multilabel.pkl"
-    joblib.dump(model, model_path)
+    model_save_path = output_dir / "tabnet_model"
+    saved_filepath = model.save_model(str(model_save_path))
 
     metrics_payload = {
-        "model_name": "XGBoost Multi-Output Baseline",
+        "model_name": "TabNet Multi-Task Classifier",
+        "architecture": f"TabNet(n_d={n_d}, n_a={n_a}, n_steps={n_steps}, gamma={gamma}, lambda_sparse={lambda_sparse})",
         "dataset": "NFHS-5 dhs_clean.parquet (198,849 records)",
         "dataset_split": {
             "train": len(X_train),
@@ -160,7 +193,7 @@ def train_and_evaluate_xgboost(random_state=42):
         "training_time_seconds": training_time_sec,
         "inference_latency": {
             "total_test_seconds": inference_time_sec,
-            "per_sample_ms": per_sample_inference_ms
+            "per_sample_ms": per_sample_ms
         },
         "overall_metrics": {
             "exact_match_accuracy": round(float(exact_match_acc), 4),
@@ -178,14 +211,14 @@ def train_and_evaluate_xgboost(random_state=42):
         "target_conditions": TARGET_CONDITIONS
     }
 
-    metrics_path = output_dir / "xgboost_metrics.json"
+    metrics_path = output_dir / "tabnet_metrics.json"
     with open(metrics_path, "w") as f:
         json.dump(metrics_payload, f, indent=2)
 
-    print(f"\nSaved XGBoost model to: {model_path}")
-    print(f"Saved metrics to: {metrics_path}")
+    print(f"\nSaved TabNet model to: {saved_filepath}")
+    print(f"Saved TabNet metrics to: {metrics_path}")
 
-    print("\n--- Test Set Performance Summary ---")
+    print("\n--- TabNet Test Set Performance Summary ---")
     print(f"Exact Match Accuracy: {exact_match_acc * 100:.2f}%")
     print(f"Macro F1-Score:       {f1_macro:.4f}")
     print(f"Weighted F1-Score:    {f1_weighted:.4f}")
@@ -199,4 +232,4 @@ def train_and_evaluate_xgboost(random_state=42):
 
 
 if __name__ == "__main__":
-    train_and_evaluate_xgboost()
+    train_and_evaluate_tabnet()

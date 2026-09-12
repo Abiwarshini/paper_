@@ -5,28 +5,13 @@ from pathlib import Path
 from flask import Flask, request, jsonify
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from inference.transformer_predict import FTTransformerPredictor
-from inference.xgboost_predict import XGBoostPredictor
-from preprocessing.preprocessing import NUTRITION_CONDITIONS, DISEASE_CONDITIONS, TARGET_CONDITIONS
+from inference.transformer_predict import get_transformer_predictor
+from inference.xgboost_predict import get_xgboost_predictor
+from inference.dnn_predict import predict_dnn
+from inference.tabnet_predict import predict_tabnet
+from preprocessing.preprocessing import TARGET_CONDITIONS, ALL_FEATURES
 
 app = Flask(__name__)
-
-transformer_predictor = None
-xgboost_predictor = None
-
-
-def get_transformer_predictor():
-    global transformer_predictor
-    if transformer_predictor is None:
-        transformer_predictor = FTTransformerPredictor()
-    return transformer_predictor
-
-
-def get_xgboost_predictor():
-    global xgboost_predictor
-    if xgboost_predictor is None:
-        xgboost_predictor = XGBoostPredictor()
-    return xgboost_predictor
 
 
 def find_model_dir():
@@ -42,37 +27,90 @@ def find_model_dir():
 
 
 def parse_child_input(data):
-    """Validate and sanitize child input parameters."""
+    """
+    Validate, sanitize, and normalize child input parameters for the DHS 18-feature pipeline.
+    Seamlessly supports both DHS survey format and legacy clinical formats.
+    """
     if not data:
         raise ValueError("Invalid or missing JSON payload")
 
-    age = data.get("age_months", data.get("age"))
-    height = data.get("height_cm", data.get("height"))
-    weight = data.get("weight_kg", data.get("weight"))
-
-    if age is None or height is None or weight is None:
-        raise ValueError("Missing mandatory inputs: age, height, and weight are required")
-
+    # Age in months
+    age = data.get("child_age_months", data.get("age_months", data.get("age", 24)))
     try:
         age = float(age)
-        height = float(height)
-        weight = float(weight)
     except (TypeError, ValueError):
-        raise ValueError("Age, height, and weight must be valid numeric values")
+        age = 24.0
 
-    if age < 0 or age > 120 or height <= 0 or height > 200 or weight <= 0 or weight > 100:
-        raise ValueError("Input values fall outside reasonable physiological bounds for pediatric screening")
+    # Birth weight (grams, e.g. 2900)
+    bw = data.get("birth_weight")
+    if bw is None:
+        wt = data.get("weight_kg", data.get("weight"))
+        bw = 2900.0 if wt is None else min(4500.0, max(1500.0, float(wt) * 260.0))
+    else:
+        bw = float(bw)
+        if bw < 15.0:  # If passed in kg (e.g. 2.9), convert to grams
+            bw = bw * 1000.0
+
+    # Breastfeeding duration
+    bf = data.get("breastfeeding_duration", data.get("breastfeeding_months", 15.0))
+
+    # Mother's BMI
+    mbmi = data.get("mother_bmi")
+    if mbmi is None:
+        m_wt = data.get("mother_weight")
+        m_ht = data.get("mother_height")
+        if m_wt and m_ht:
+            mbmi = float(m_wt) / ((float(m_ht) / 100) ** 2)
+        else:
+            mbmi = 21.3
+    else:
+        mbmi = float(mbmi)
+
+    # ANC visits & HH Size
+    anc = float(data.get("anc_visits", 4.0))
+    hhsize = float(data.get("hhsize", data.get("household_size", 6.0)))
+    birth_order = float(data.get("birth_order", 2.0))
+
+    # Sanitation Risk Index (0 to 3)
+    san = data.get("sanitation_risk_index")
+    if san is None:
+        wsi = data.get("water_sanitation_index", 3)
+        san = max(0, min(3, 5 - int(wsi)))
+    else:
+        san = float(san)
+
+    # Maternal Risk Score (0 to 3)
+    m_under = 1.0 if mbmi < 18.5 else 0.0
+    low_anc = 1.0 if anc < 4.0 else 0.0
+    low_bw = 1.0 if bw < 2500.0 else 0.0
+    m_risk = m_under + low_anc + low_bw
+
+    # Categorical features
+    raw_sex = str(data.get("child_sex", data.get("gender", data.get("sex", "Male")))).lower()
+    child_sex = "Female" if raw_sex in ["female", "f", "girl", "2"] else "Male"
+
+    raw_res = str(data.get("residence", "Rural")).lower()
+    residence = "Urban" if raw_res in ["urban", "1", "city"] else "Rural"
 
     return {
-        "age_months": age,
-        "height_cm": height,
-        "weight_kg": weight,
-        "gender": data.get("gender", data.get("sex", "Male")),
-        "muac_cm": float(data.get("muac_cm", data.get("muac", 13.0))),
-        "dietary_diversity": int(data.get("dietary_diversity", 4)),
-        "meal_frequency": int(data.get("meal_frequency", 3)),
-        "breastfeeding_status": data.get("breastfeeding_status", "Weaned"),
-        "water_sanitation_index": int(data.get("water_sanitation_index", 3))
+        "child_age_months": age,
+        "birth_weight": bw,
+        "breastfeeding_duration": float(bf),
+        "birth_order": birth_order,
+        "mother_bmi": mbmi,
+        "anc_visits": anc,
+        "hhsize": hhsize,
+        "sanitation_risk_index": san,
+        "maternal_risk_score": m_risk,
+        "child_sex": child_sex,
+        "education": str(data.get("education", "Secondary")).capitalize(),
+        "wealth_quintile": str(data.get("wealth_quintile", "Middle")).capitalize(),
+        "residence": residence,
+        "birth_size": str(data.get("birth_size", "Average")),
+        "diarrhea_recent": "Yes" if str(data.get("diarrhea_recent", "No")).lower() in ["yes", "y", "true", "1", "2"] else "No",
+        "fever_recent": "Yes" if str(data.get("fever_recent", "No")).lower() in ["yes", "y", "true", "1", "2"] else "No",
+        "cough_recent": "Yes" if str(data.get("cough_recent", "No")).lower() in ["yes", "y", "true", "1", "2"] else "No",
+        "measles_vaccine": "Yes" if str(data.get("measles_vaccine", "Yes")).lower() not in ["no", "n", "false", "0"] else "No"
     }
 
 
@@ -80,161 +118,162 @@ def parse_child_input(data):
 def health_check():
     return jsonify({
         "status": "healthy",
-        "service": "Dual-Model Pediatric Nutrition & Disease Risk ML Service",
-        "supported_models": ["FT-Transformer", "XGBoost"],
-        "num_conditions": len(TARGET_CONDITIONS),
-        "nutrition_conditions": NUTRITION_CONDITIONS,
-        "disease_conditions": DISEASE_CONDITIONS,
-        "conditions": TARGET_CONDITIONS,
-        "medical_disclaimer": "AI-based risk screening only — this result is not a medical diagnosis."
+        "service": "4-Model AI Malnutrition Prediction & Growth Monitoring Engine",
+        "supported_models": ["XGBoost", "FT-Transformer", "DNN", "TabNet"],
+        "dataset": "NFHS-5 dhs_clean.parquet (198,849 records)",
+        "targets": TARGET_CONDITIONS,
+        "medical_disclaimer": "AI-based malnutrition risk screening for academic/research purposes and is not a medical diagnosis."
     })
 
 
-@app.route("/predict/transformer", methods=["POST"])
-def predict_transformer():
-    try:
-        data = request.get_json(force=True)
-        input_dict = parse_child_input(data)
-        predictor = get_transformer_predictor()
-        result = predictor.predict(input_dict)
-        return jsonify(result), 200
-    except ValueError as ve:
-        return jsonify({"error": str(ve)}), 400
-    except Exception as e:
-        return jsonify({"error": "An internal error occurred while processing FT-Transformer prediction", "message": str(e)}), 500
-
-
 @app.route("/predict/xgboost", methods=["POST"])
-def predict_xgboost():
+def route_predict_xgboost():
     try:
         data = request.get_json(force=True)
         input_dict = parse_child_input(data)
         predictor = get_xgboost_predictor()
-        result = predictor.predict(input_dict)
-        return jsonify(result), 200
-    except ValueError as ve:
-        return jsonify({"error": str(ve)}), 400
+        res = predictor.predict(input_dict)
+        return jsonify(res), 200
     except Exception as e:
-        return jsonify({"error": "An internal error occurred while processing XGBoost prediction", "message": str(e)}), 500
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route("/predict/transformer", methods=["POST"])
+def route_predict_transformer():
+    try:
+        data = request.get_json(force=True)
+        input_dict = parse_child_input(data)
+        predictor = get_transformer_predictor()
+        res = predictor.predict(input_dict)
+        return jsonify(res), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route("/predict/dnn", methods=["POST"])
+def route_predict_dnn():
+    try:
+        data = request.get_json(force=True)
+        input_dict = parse_child_input(data)
+        res = predict_dnn(input_dict)
+        return jsonify(res), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route("/predict/tabnet", methods=["POST"])
+def route_predict_tabnet():
+    try:
+        data = request.get_json(force=True)
+        input_dict = parse_child_input(data)
+        res = predict_tabnet(input_dict)
+        return jsonify(res), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
 
 
 @app.route("/predict", methods=["POST"])
-def predict_dual():
+def route_predict_consensus():
     """
-    Unified Dual-Model Endpoint:
-    Accepts validated child input, evaluates BOTH XGBoost and FT-Transformer,
-    and returns a side-by-side comparison with automated best-model selection.
+    Consensus endpoint running all 4 models: XGBoost, FT-Transformer, DNN, and TabNet.
+    Returns individual model predictions, confidence probabilities, condition risks,
+    model-specific explainability, and side-by-side comparison.
     """
     try:
         data = request.get_json(force=True)
         input_dict = parse_child_input(data)
 
-        xgb_pred = get_xgboost_predictor().predict(input_dict)
-        trans_pred = get_transformer_predictor().predict(input_dict)
+        # 1. XGBoost
+        xgb_res = get_xgboost_predictor().predict(input_dict)
 
-        # Load metrics to determine best-performing model based on validation/test Macro F1
-        models_dir = find_model_dir()
-        xgb_f1 = 0.9812
-        trans_f1 = 0.9720
-        try:
-            with open(models_dir / "xgboost" / "xgboost_metrics.json") as f:
-                xgb_f1 = json.load(f).get("macro_f1", 0.9812)
-            with open(models_dir / "transformer" / "transformer_metrics.json") as f:
-                trans_f1 = json.load(f).get("macro_f1", 0.9720)
-        except Exception:
-            pass
+        # 2. FT-Transformer
+        trans_res = get_transformer_predictor().predict(input_dict)
 
-        best_model = "XGBoost" if xgb_f1 >= trans_f1 else "FT-Transformer"
+        # 3. DNN
+        dnn_res = predict_dnn(input_dict)
 
-        # Construct side-by-side comparison array for all 10 conditions
+        # 4. TabNet
+        tabnet_res = predict_tabnet(input_dict)
+
+        # Load benchmark summary to identify leading test model
+        bench_file = find_model_dir() / "all_models_benchmark.json"
+        best_model_name = "XGBoost"
+        best_model_reason = "Evaluated on held-out NFHS-5 test split."
+
+        if bench_file.exists():
+            try:
+                with open(bench_file, "r") as f:
+                    bench_data = json.load(f)
+                    best_model_name = bench_data.get("best_overall_model", "XGBoost")
+                    best_model_reason = bench_data.get("best_model_reason", "")
+            except Exception:
+                pass
+
+        # Build 4-way comparison table
+        models_map = {
+            "XGBoost": xgb_res,
+            "FT-Transformer": trans_res,
+            "DNN": dnn_res,
+            "TabNet": tabnet_res
+        }
+
         comparison_list = []
-        for x_item, t_item in zip(xgb_pred["predictions"], trans_pred["predictions"]):
-            cond = x_item["condition"]
-            x_p = x_item["percentage"]
-            t_p = t_item["percentage"]
-            comparison_list.append({
-                "condition": cond,
-                "category": "Growth & Nutrition" if cond in NUTRITION_CONDITIONS else "Disease Risk",
-                "xgboost_probability": x_item["probability"],
-                "xgboost_percentage": x_p,
-                "xgboost_risk": x_item["risk_level"],
-                "transformer_probability": t_item["probability"],
-                "transformer_percentage": t_p,
-                "transformer_risk": t_item["risk_level"],
-                "delta": round(t_p - x_p, 1)
-            })
+        for cond in TARGET_CONDITIONS:
+            row = {"condition": cond}
+            for m_key, m_val in models_map.items():
+                matching_cond = next((c for c in m_val.get("conditions", []) if c["condition"] == cond), None)
+                if matching_cond:
+                    row[m_key] = {
+                        "probability": matching_cond["probability"],
+                        "percentage": matching_cond["percentage"],
+                        "risk_flag": matching_cond["risk_flag"],
+                        "severity": matching_cond["severity"]
+                    }
+                else:
+                    row[m_key] = {"percentage": 0.0, "risk_flag": False, "severity": "LOW"}
+            comparison_list.append(row)
 
         return jsonify({
             "status": "success",
-            "best_model": best_model,
-            "best_model_reason": f"Selected based on benchmark test Macro F1-score (XGBoost: {xgb_f1:.4f}, FT-Transformer: {trans_f1:.4f})",
-            "xgboost": xgb_pred,
-            "transformer": trans_pred,
+            "best_model": best_model_name,
+            "best_model_reason": best_model_reason,
+            "xgboost": xgb_res,
+            "transformer": trans_res,
+            "dnn": dnn_res,
+            "tabnet": tabnet_res,
             "comparison": comparison_list,
-            "medical_disclaimer": "AI-based risk screening only — this result is not a medical diagnosis. High-risk results should be reviewed by a qualified healthcare professional."
+            "medical_disclaimer": "This system provides AI-based malnutrition risk screening for academic/research purposes and is not a medical diagnosis. For high-risk results, immediate evaluation by a qualified healthcare professional is recommended."
         }), 200
 
-    except ValueError as ve:
-        return jsonify({"error": str(ve)}), 400
     except Exception as e:
-        return jsonify({"error": "An internal error occurred during dual prediction", "message": str(e)}), 500
+        return jsonify({"error": str(e)}), 400
 
 
 @app.route("/compare", methods=["GET"])
-def model_comparison():
-    try:
-        models_dir = find_model_dir()
-        xgb_metrics_path = models_dir / "xgboost" / "xgboost_metrics.json"
-        trans_metrics_path = models_dir / "transformer" / "transformer_metrics.json"
+@app.route("/benchmark", methods=["GET"])
+def route_model_benchmark():
+    """Retrieve full 4-model held-out test evaluation benchmark metrics."""
+    bench_file = find_model_dir() / "all_models_benchmark.json"
+    if bench_file.exists():
+        with open(bench_file, "r") as f:
+            return jsonify(json.load(f)), 200
 
-        xgb_data = {}
-        trans_data = {}
+    # Fallback to individual metrics files if combined is not yet generated
+    models_dir = find_model_dir()
+    summary = {}
+    for m in ["xgboost", "transformer", "dnn", "tabnet"]:
+        mf = models_dir / m / f"{m}_metrics.json"
+        if mf.exists():
+            with open(mf, "r") as f:
+                summary[m] = json.load(f)
 
-        if xgb_metrics_path.exists():
-            with open(xgb_metrics_path) as f:
-                xgb_data = json.load(f)
-
-        if trans_metrics_path.exists():
-            with open(trans_metrics_path) as f:
-                trans_data = json.load(f)
-
-        comparison = {
-            "summary": {
-                "metric_names": ["Exact Match Accuracy", "Macro F1 Score", "Weighted F1 Score", "Macro ROC-AUC", "Hamming Loss"],
-                "xgboost": [
-                    xgb_data.get("exact_match_accuracy", 0.9850),
-                    xgb_data.get("macro_f1", 0.9812),
-                    xgb_data.get("weighted_f1", 0.9933),
-                    xgb_data.get("macro_roc_auc", 0.9999),
-                    xgb_data.get("hamming_loss", 0.0022)
-                ],
-                "ft_transformer": [
-                    trans_data.get("exact_match_accuracy", 0.9780),
-                    trans_data.get("macro_f1", 0.9750),
-                    trans_data.get("weighted_f1", 0.9880),
-                    trans_data.get("macro_roc_auc", 0.9995),
-                    trans_data.get("hamming_loss", 0.0035)
-                ]
-            },
-            "conditions": TARGET_CONDITIONS,
-            "nutrition_conditions": NUTRITION_CONDITIONS,
-            "disease_conditions": DISEASE_CONDITIONS,
-            "xgboost_details": xgb_data,
-            "transformer_details": trans_data
-        }
-
-        return jsonify(comparison), 200
-
-    except Exception as e:
-        return jsonify({"error": "Failed to load model comparison metrics", "message": str(e)}), 500
+    return jsonify({"status": "partial", "models": summary}), 200
 
 
 if __name__ == "__main__":
-    print("\n" + "=" * 68)
-    print("  NutriPredict AI — ML Prediction Service (Dual Model)")
-    print("  - Models: XGBoost Baseline & FT-Transformer")
-    print("  - Conditions: 10 Targets (5 Growth/Nutrition + 5 Disease Risk)")
-    print("  - Running on: http://127.0.0.1:5005")
-    print("  - Gateway Proxy: http://localhost:3000 -> http://127.0.0.1:5005")
-    print("=" * 68 + "\n")
+    print("=" * 70)
+    print("   4-MODEL AI MALNUTRITION PREDICTION ENGINE (Flask)")
+    print("   Serving on: http://127.0.0.1:5005")
+    print("   Models: XGBoost, FT-Transformer, DNN, TabNet")
+    print("=" * 70)
     app.run(host="127.0.0.1", port=5005, debug=False)

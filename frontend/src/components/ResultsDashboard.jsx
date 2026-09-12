@@ -1,30 +1,36 @@
 import React, { useState } from 'react';
-import { AlertTriangle, CheckCircle, ShieldAlert, Cpu, ChevronDown, ChevronUp, FileText, Info, Sparkles, Activity, HeartPulse, ArrowRight } from 'lucide-react';
+import { AlertTriangle, CheckCircle, ShieldAlert, Cpu, ChevronDown, ChevronUp, Sparkles, Activity, HeartPulse, ArrowRight, Stethoscope, BarChart3 } from 'lucide-react';
 
 export default function ResultsDashboard({ result, childInfo, onReset }) {
-  const [showTechDetails, setShowTechDetails] = useState(false);
-  const [showComparisonTable, setShowComparisonTable] = useState(true);
+  const [selectedModelTab, setSelectedModelTab] = useState('best'); // 'best' | 'xgboost' | 'transformer' | 'dnn' | 'tabnet'
 
   if (!result) return null;
 
-  // Determine if this is a dual-model result or single-model result
-  const isDual = Boolean(result.xgboost && result.transformer);
-  const primaryResult = isDual
-    ? (result.best_model === 'FT-Transformer' ? result.transformer : result.xgboost)
-    : result;
+  const isFourModel = Boolean(result.xgboost && result.transformer && result.dnn && result.tabnet);
+
+  // Active displayed model
+  let displayedResult = result;
+  if (isFourModel) {
+    if (selectedModelTab === 'best') {
+      const bestName = (result.best_model || 'XGBoost').toLowerCase();
+      displayedResult = result[bestName] || result.xgboost || result.dnn || result.tabnet;
+    } else {
+      displayedResult = result[selectedModelTab] || result.xgboost;
+    }
+  }
 
   const {
     model,
+    architecture,
     overall_risk,
-    top_prediction,
-    top_probability,
-    top_disease_risk,
-    top_disease_probability,
-    nutrition_assessment,
-    disease_screening,
-    top_factors,
+    prediction,
+    probability,
+    percentage,
+    conditions = [],
+    top_factors = [],
+    explainability_method,
     medical_disclaimer
-  } = primaryResult;
+  } = displayedResult;
 
   const formattedDate = new Date().toLocaleDateString('en-GB', {
     day: '2-digit',
@@ -33,19 +39,26 @@ export default function ResultsDashboard({ result, childInfo, onReset }) {
   });
 
   const getRiskColor = (risk) => {
-    if (!risk) return 'var(--risk-low)';
-    const r = risk.toUpperCase();
-    if (r.includes('HIGH')) return 'var(--risk-high)';
-    if (r.includes('MODERATE')) return 'var(--risk-moderate)';
-    return 'var(--risk-low)';
+    if (!risk) return '#22c55e';
+    const r = String(risk).toUpperCase();
+    if (r.includes('HIGH')) return '#ef4444';
+    if (r.includes('MODERATE')) return '#eab308';
+    return '#22c55e';
   };
 
   const getRiskBadgeClass = (risk) => {
     if (!risk) return 'low';
-    const r = risk.toUpperCase();
+    const r = String(risk).toUpperCase();
     if (r.includes('HIGH')) return 'high';
     if (r.includes('MODERATE')) return 'moderate';
     return 'low';
+  };
+
+  const stuntingCondition = conditions.find(c => c.condition === 'Stunting');
+  const wastingCondition = conditions.find(c => c.condition === 'Wasting');
+  const malnutritionCondition = conditions.find(c => c.condition === 'Malnutrition') || {
+    percentage: percentage || (probability ? (probability * 100).toFixed(1) : 50.0),
+    severity: overall_risk || 'LOW'
   };
 
   return (
@@ -55,357 +68,258 @@ export default function ResultsDashboard({ result, childInfo, onReset }) {
       <div className="glass-panel" style={{ padding: '1.5rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.35rem' }}>
-            <HeartPulse size={24} color="var(--accent-teal)" />
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-              Pediatric Nutrition & Health Screening Assessment
+            <HeartPulse size={24} color="#6366f1" />
+            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+              AI Malnutrition Risk Assessment
             </h2>
           </div>
           <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
             Child: <strong style={{ color: 'var(--text-primary)' }}>{childInfo?.childName || 'Child #1042'}</strong> | 
-            Age: <strong style={{ color: 'var(--text-primary)' }}>{childInfo?.age_months} months</strong> | 
-            Gender: <strong style={{ color: 'var(--text-primary)' }}>{childInfo?.gender || 'Female'}</strong> | 
+            Age: <strong style={{ color: 'var(--text-primary)' }}>{childInfo?.child_age_months || childInfo?.age_months} mo</strong> | 
+            Sex: <strong style={{ color: 'var(--text-primary)' }}>{childInfo?.child_sex || childInfo?.gender || 'Female'}</strong> | 
+            Residence: <strong style={{ color: 'var(--text-primary)' }}>{childInfo?.residence || 'Rural'}</strong> | 
             Date: {formattedDate}
           </p>
         </div>
 
         {/* Overall Risk Score Badge */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'rgba(255,255,255,0.03)', padding: '0.75rem 1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'rgba(255,255,255,0.03)', padding: '0.75rem 1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)' }}>
           <div>
-            <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700 }}>
-              Overall Screening Risk
+            <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 700 }}>
+              Malnutrition Risk Tier
             </div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 900, color: getRiskColor(overall_risk) }}>
+            <div style={{ fontSize: '1.4rem', fontWeight: 900, color: getRiskColor(overall_risk) }}>
               {overall_risk || 'LOW'} RISK
             </div>
           </div>
           {(overall_risk || '').toUpperCase() === 'HIGH' ? (
-            <ShieldAlert size={36} color="var(--risk-high)" />
+            <ShieldAlert size={36} color="#ef4444" />
           ) : (overall_risk || '').toUpperCase() === 'MODERATE' ? (
-            <AlertTriangle size={36} color="var(--risk-moderate)" />
+            <AlertTriangle size={36} color="#eab308" />
           ) : (
-            <CheckCircle size={36} color="var(--risk-low)" />
+            <CheckCircle size={36} color="#22c55e" />
           )}
         </div>
       </div>
 
-      {/* Dual Model Winner Banner (if dual prediction was run) */}
-      {isDual && (
-        <div className="glass-panel" style={{ padding: '1.25rem 1.75rem', background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(20, 184, 166, 0.1))', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <Sparkles size={24} color="#a5b4fc" />
-              <div>
-                <span style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--accent-teal)' }}>
-                  Automated Dual-Model Consensus Evaluation
-                </span>
-                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '0.15rem' }}>
-                  Best Performing Model Selected: <span style={{ color: 'var(--accent-teal)' }}>{result.best_model}</span>
-                </div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-                  {result.best_model_reason}
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '1rem' }}>
-              <div style={{ textAlign: 'right', padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.04)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
-                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>XGBoost Baseline</div>
-                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#a5b4fc' }}>
-                  {result.xgboost?.top_prediction}: {(result.xgboost?.top_probability * 100).toFixed(1)}%
-                </div>
-              </div>
-              <div style={{ textAlign: 'right', padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.04)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
-                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>FT-Transformer</div>
-                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#2dd4bf' }}>
-                  {result.transformer?.top_prediction}: {(result.transformer?.top_probability * 100).toFixed(1)}%
-                </div>
+      {/* Model Selection Switcher (when 4-model result is returned) */}
+      {isFourModel && (
+        <div className="glass-panel" style={{ padding: '1rem 1.5rem', background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <Sparkles size={20} color="#818cf8" />
+            <div>
+              <span style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: '#818cf8', letterSpacing: '0.05em' }}>
+                4-Model Consensus Suite
+              </span>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                Viewing predictions from: <strong style={{ color: '#fff' }}>{model}</strong>
               </div>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Side-by-Side Model Comparison Table (when Dual Model enabled) */}
-      {isDual && result.comparison && (
-        <div className="glass-panel" style={{ padding: '1.5rem 2rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Activity size={18} color="var(--accent-teal)" />
-              Side-by-Side Model Prediction Comparison (10 Conditions)
-            </h3>
+          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
             <button
               type="button"
-              onClick={() => setShowComparisonTable(!showComparisonTable)}
-              style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+              className={`btn ${selectedModelTab === 'best' ? 'btn-primary' : 'btn-outline'}`}
+              style={{ fontSize: '0.8rem', padding: '0.35rem 0.8rem' }}
+              onClick={() => setSelectedModelTab('best')}
             >
-              {showComparisonTable ? 'Collapse Table' : 'Expand Table'}
-              {showComparisonTable ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              ★ Leading Model ({result.best_model || 'XGBoost'})
+            </button>
+            <button
+              type="button"
+              className={`btn ${selectedModelTab === 'xgboost' ? 'btn-primary' : 'btn-outline'}`}
+              style={{ fontSize: '0.8rem', padding: '0.35rem 0.8rem' }}
+              onClick={() => setSelectedModelTab('xgboost')}
+            >
+              XGBoost
+            </button>
+            <button
+              type="button"
+              className={`btn ${selectedModelTab === 'transformer' ? 'btn-primary' : 'btn-outline'}`}
+              style={{ fontSize: '0.8rem', padding: '0.35rem 0.8rem' }}
+              onClick={() => setSelectedModelTab('transformer')}
+            >
+              FT-Transformer
+            </button>
+            <button
+              type="button"
+              className={`btn ${selectedModelTab === 'dnn' ? 'btn-primary' : 'btn-outline'}`}
+              style={{ fontSize: '0.8rem', padding: '0.35rem 0.8rem' }}
+              onClick={() => setSelectedModelTab('dnn')}
+            >
+              DNN
+            </button>
+            <button
+              type="button"
+              className={`btn ${selectedModelTab === 'tabnet' ? 'btn-primary' : 'btn-outline'}`}
+              style={{ fontSize: '0.8rem', padding: '0.35rem 0.8rem' }}
+              onClick={() => setSelectedModelTab('tabnet')}
+            >
+              TabNet
             </button>
           </div>
-
-          {showComparisonTable && (
-            <div style={{ overflowX: 'auto' }}>
-              <table className="comparison-table" style={{ width: '100%' }}>
-                <thead>
-                  <tr>
-                    <th>Category</th>
-                    <th>Condition Target</th>
-                    <th>XGBoost Probability</th>
-                    <th>FT-Transformer Probability</th>
-                    <th>Risk Level</th>
-                    <th>Delta (Diff)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.comparison.map((row, idx) => (
-                    <tr key={idx}>
-                      <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{row.category}</td>
-                      <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{row.condition}</td>
-                      <td style={{ fontWeight: 700, color: '#a5b4fc' }}>{row.xgboost_percentage}%</td>
-                      <td style={{ fontWeight: 700, color: '#2dd4bf' }}>{row.transformer_percentage}%</td>
-                      <td>
-                        <span className={`risk-badge ${getRiskBadgeClass(row.xgboost_risk)}`}>
-                          {row.xgboost_risk}
-                        </span>
-                      </td>
-                      <td style={{ color: Math.abs(row.delta) <= 3 ? 'var(--text-muted)' : (row.delta > 0 ? '#2dd4bf' : '#a5b4fc'), fontWeight: 600 }}>
-                        {row.delta > 0 ? `+${row.delta}%` : `${row.delta}%`}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
         </div>
       )}
 
-      {/* SECTION 1: Growth & Nutrition Assessment (5 Indicators) */}
-      <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '1rem' }}>
-          <div>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Activity size={20} color="var(--accent-primary)" />
-              Section 1 — Growth & Nutrition Assessment (5 Indicators)
-            </h3>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-              Evaluated based on child anthropometrics and WHO Child Growth Standards (HAZ, WHZ, WAZ).
-            </p>
-          </div>
-          {top_prediction && (
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              Primary Growth Finding: <strong style={{ color: 'var(--text-primary)' }}>{top_prediction}</strong> ({((top_probability || 0) * 100).toFixed(1)}%)
+      {/* Primary Malnutrition Prediction Card & Details */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+        
+        {/* Main Result Card */}
+        <div className="glass-panel" style={{ padding: '1.75rem', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: '-10px', right: '-10px', width: '90px', height: '90px', background: `radial-gradient(circle, ${getRiskColor(overall_risk)}22 0%, transparent 70%)` }} />
+          
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+            <div>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Primary Malnutrition Screening
+              </span>
+              <h3 style={{ fontSize: '1.3rem', fontWeight: 800, marginTop: '0.2rem', color: 'var(--text-primary)' }}>
+                {prediction || 'Normal (Well-Nourished)'}
+              </h3>
+            </div>
+            <span className={`badge ${getRiskBadgeClass(overall_risk)}`}>
+              {overall_risk || 'LOW'}
             </span>
-          )}
-        </div>
-
-        <div className="cards-grid">
-          {(nutrition_assessment || primaryResult.predictions?.slice(0, 5))?.map((pred, idx) => {
-            const badgeClass = getRiskBadgeClass(pred.risk_level);
-            return (
-              <div key={idx} className={`glass-panel disease-card risk-${badgeClass}`}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                  <span style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    {pred.condition}
-                  </span>
-                  <span className={`risk-badge ${badgeClass}`}>
-                    {pred.risk_level}
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '0.5rem 0' }}>
-                  <span style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                    {pred.percentage}%
-                  </span>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    threshold: {((pred.threshold || 0.5) * 100).toFixed(0)}%
-                  </span>
-                </div>
-
-                <div className="progress-bar-bg">
-                  <div
-                    className={`progress-bar-fill ${badgeClass}`}
-                    style={{ width: `${Math.max(pred.percentage, 5)}%` }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* SECTION 2: Pediatric Disease & Health-Condition Risk Screening (5 Targets) */}
-      <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '1rem' }}>
-          <div>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <HeartPulse size={20} color="var(--accent-teal)" />
-              Section 2 — Pediatric Disease & Health-Condition Risk Screening (5 Targets)
-            </h3>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-              Biomarker and clinical nutritional deficiency risk screening (Anemia, IDA, Vitamin A, PEM, Micronutrients).
-            </p>
           </div>
-          {top_disease_risk && (
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              Primary Disease Risk: <strong style={{ color: 'var(--text-primary)' }}>{top_disease_risk}</strong> ({((top_disease_probability || 0) * 100).toFixed(1)}%)
-            </span>
-          )}
+
+          {/* Probability Gauge Bar */}
+          <div style={{ marginBottom: '1.25rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.4rem' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>Predicted Probability:</span>
+              <strong style={{ color: getRiskColor(overall_risk), fontSize: '1.1rem' }}>
+                {malnutritionCondition.percentage}%
+              </strong>
+            </div>
+            <div style={{ width: '100%', height: '10px', background: 'rgba(255,255,255,0.08)', borderRadius: '999px', overflow: 'hidden' }}>
+              <div
+                style={{
+                  width: `${Math.min(100, Math.max(5, malnutritionCondition.percentage))}%`,
+                  height: '100%',
+                  background: `linear-gradient(90deg, #6366f1, ${getRiskColor(overall_risk)})`,
+                  borderRadius: '999px',
+                  transition: 'width 0.8s ease'
+                }}
+              />
+            </div>
+          </div>
+
+          <div style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+            <strong>Model Architecture:</strong> {model} ({architecture || 'Tabular Machine Learning'})
+          </div>
         </div>
 
-        <div className="cards-grid">
-          {(disease_screening || primaryResult.predictions?.slice(5, 10))?.map((pred, idx) => {
-            const badgeClass = getRiskBadgeClass(pred.risk_level);
-            return (
-              <div key={idx} className={`glass-panel disease-card risk-${badgeClass}`}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                  <span style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    {pred.condition}
-                  </span>
-                  <span className={`risk-badge ${badgeClass}`}>
-                    {pred.risk_level}
-                  </span>
-                </div>
+        {/* Stunting & Wasting Breakdown Card */}
+        <div className="glass-panel" style={{ padding: '1.75rem' }}>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Activity size={18} color="#06b6d4" />
+            WHO Anthropometric Condition Breakdown
+          </h3>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '0.5rem 0' }}>
-                  <span style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                    {pred.percentage}%
-                  </span>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    threshold: {((pred.threshold || 0.4) * 100).toFixed(0)}%
-                  </span>
-                </div>
-
-                <div className="progress-bar-bg">
-                  <div
-                    className={`progress-bar-fill ${badgeClass}`}
-                    style={{ width: `${Math.max(pred.percentage, 5)}%` }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Important Contributing Factors (Explainability) */}
-      <div className="glass-panel" style={{ padding: '1.5rem 2rem' }}>
-        <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Info size={18} color="var(--accent-teal)" />
-          Model Explainability — Top Contributing Biomarkers & Features
-        </h3>
-        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
-          Extracted directly via <strong>{isDual ? 'XGBoost SHAP Tree Attributions & Transformer Gradients' : (primaryResult.model === 'XGBoost' ? 'SHAP Feature Importances' : 'Input Gradient Attributions')}</strong>:
-        </p>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-          {top_factors?.map((factor, idx) => (
-            <div key={idx} style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          {/* Stunting Card */}
+          <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
               <div>
-                <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                  {idx + 1}. {factor.feature}
-                </div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                  {factor.influence}
-                </div>
+                <strong style={{ fontSize: '0.95rem' }}>Stunting (Height-for-Age Deficit)</strong>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Chronic nutritional deprivation (HAZ &le; -2.0 SD)</div>
               </div>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.2rem 0.6rem', borderRadius: 'var(--radius-full)', background: 'rgba(99, 102, 241, 0.15)', color: '#a5b4fc', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
-                {factor.impact}
+              <span className={`badge ${getRiskBadgeClass(stuntingCondition?.severity || 'low')}`}>
+                {stuntingCondition?.severity || 'LOW'}
               </span>
             </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Supportive Clinical & Nutrition Recommendations */}
-      <div className="glass-panel" style={{ padding: '1.5rem 2rem', background: 'linear-gradient(135deg, rgba(20, 184, 166, 0.08), rgba(99, 102, 241, 0.05))', border: '1px solid rgba(20, 184, 166, 0.3)' }}>
-        <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--accent-teal)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Sparkles size={18} color="var(--accent-teal)" />
-          Supportive Guidance & Nutrition Decision Support
-        </h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
-          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: 'var(--radius-sm)' }}>
-            <strong style={{ color: 'var(--text-primary)', fontSize: '0.9rem', display: 'block', marginBottom: '0.35rem' }}>
-              Dietary Intervention
-            </strong>
-            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-              Increase dietary diversity to &ge;5 food groups per WHO IYCF guidelines. Introduce iron-rich complementary foods (pulses, greens, animal-source foods) and Vitamin A sources.
-            </p>
-          </div>
-          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: 'var(--radius-sm)' }}>
-            <strong style={{ color: 'var(--text-primary)', fontSize: '0.9rem', display: 'block', marginBottom: '0.35rem' }}>
-              Growth Monitoring
-            </strong>
-            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-              Schedule fortnightly growth monitoring at the local Anganwadi/ICDS center to track height-for-age and weight-for-height trajectory.
-            </p>
-          </div>
-          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: 'var(--radius-sm)' }}>
-            <strong style={{ color: 'var(--text-primary)', fontSize: '0.9rem', display: 'block', marginBottom: '0.35rem' }}>
-              Healthcare Referral
-            </strong>
-            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-              For moderate or high anemia/PEM risk, prompt clinical evaluation by an Auxiliary Nurse Midwife (ANM) or pediatrician for IFA supplementation and deworming.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Expandable Technical Details Section */}
-      <div className="glass-panel" style={{ padding: '1rem 1.5rem' }}>
-        <button
-          type="button"
-          onClick={() => setShowTechDetails(!showTechDetails)}
-          style={{ width: '100%', background: 'transparent', border: 'none', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 700 }}
-        >
-          <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <FileText size={16} color="var(--accent-primary)" />
-            View Technical Architecture & Data Specifications
-          </span>
-          {showTechDetails ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-        </button>
-
-        {showTechDetails && (
-          <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-              <div>
-                <strong style={{ color: 'var(--text-primary)' }}>Models Implemented:</strong> XGBoost & FT-Transformer
-              </div>
-              <div>
-                <strong style={{ color: 'var(--text-primary)' }}>Conditions Evaluated:</strong> 10 Targets (5 Nutrition + 5 Disease Risk)
-              </div>
-              <div>
-                <strong style={{ color: 'var(--text-primary)' }}>Leakage Protection:</strong> Direct target z-scores excluded from features
-              </div>
-              <div>
-                <strong style={{ color: 'var(--text-primary)' }}>Explainability:</strong> SHAP (XGBoost) + Input Gradients (Transformer)
-              </div>
-              <div>
-                <strong style={{ color: 'var(--text-primary)' }}>Training Samples:</strong> 69,999 records (70% train split)
-              </div>
-              <div>
-                <strong style={{ color: 'var(--text-primary)' }}>Test Benchmark:</strong> 15,000 held-out evaluation samples
-              </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>Risk Probability:</span>
+              <strong style={{ color: getRiskColor(stuntingCondition?.severity) }}>{stuntingCondition?.percentage || 0}%</strong>
             </div>
           </div>
+
+          {/* Wasting Card */}
+          <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+              <div>
+                <strong style={{ fontSize: '0.95rem' }}>Wasting (Weight-for-Height Deficit)</strong>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Acute nutritional deficiency (WHZ &le; -2.0 SD)</div>
+              </div>
+              <span className={`badge ${getRiskBadgeClass(wastingCondition?.severity || 'low')}`}>
+                {wastingCondition?.severity || 'LOW'}
+              </span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>Risk Probability:</span>
+              <strong style={{ color: getRiskColor(wastingCondition?.severity) }}>{wastingCondition?.percentage || 0}%</strong>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      {/* Model Explainability & Feature Contribution */}
+      <div className="glass-panel" style={{ padding: '1.75rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <BarChart3 size={20} color="#6366f1" />
+              Model Explainability & Key Driving Factors
+            </h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+              Attribution method: <strong style={{ color: '#a5b4fc' }}>{explainability_method || 'Feature Importance Analysis'}</strong>
+            </p>
+          </div>
+        </div>
+
+        {top_factors && top_factors.length > 0 ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+            {top_factors.map((factor, idx) => (
+              <div
+                key={idx}
+                style={{
+                  padding: '1rem',
+                  background: 'rgba(255,255,255,0.02)',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                  borderLeft: factor.impact_level === 'High Impact' ? '4px solid #ef4444' : (factor.impact_level === 'Moderate Impact' ? '4px solid #eab308' : '4px solid #6366f1')
+                }}
+              >
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                  {factor.feature}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Relative Weight:</span>
+                  <strong style={{ color: '#fff' }}>{factor.contribution_pct}%</strong>
+                </div>
+                <div style={{ marginTop: '0.5rem', fontSize: '0.7rem', color: factor.impact_level === 'High Impact' ? '#ef4444' : (factor.impact_level === 'Moderate Impact' ? '#eab308' : '#818cf8'), fontWeight: 600 }}>
+                  ● {factor.impact_level}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>No feature importance data returned for this case.</p>
         )}
       </div>
 
-      {/* Prominent Medical Disclaimer */}
-      <div className="disclaimer-box">
-        <AlertTriangle size={26} style={{ flexShrink: 0, color: '#fbbf24' }} />
+      {/* Mandatory Medical Safety Disclaimer */}
+      <div className="glass-panel" style={{ padding: '1.25rem 1.75rem', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.25)', display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
+        <Stethoscope size={24} color="#ef4444" style={{ flexShrink: 0, marginTop: '0.2rem' }} />
         <div>
-          <strong style={{ color: '#fbbf24', display: 'block', marginBottom: '0.25rem' }}>
-            Medical & Clinical Research Disclaimer
-          </strong>
-          {medical_disclaimer || "AI-based risk screening only — this result is not a medical diagnosis. High-risk results should be reviewed by a qualified healthcare professional."}
+          <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#ef4444', marginBottom: '0.25rem' }}>
+            Clinical Safety & Ethical Disclaimer
+          </h4>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+            This system provides <strong>AI-based malnutrition risk screening for academic and research purposes</strong> and is <strong>not a medical diagnosis</strong>. 
+            Any child flagged with Moderate or High risk should immediately be referred to a qualified pediatrician or public health worker (ANM/ICDS) for clinical measurement and intervention.
+          </p>
         </div>
       </div>
 
-      {/* Back / New Assessment Button */}
-      <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
-        <button type="button" onClick={onReset} className="btn-primary" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid var(--border-color)', boxShadow: 'none' }}>
-          ← Start New Child Health Screening
+      {/* Action Footer */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+        <button
+          type="button"
+          className="btn btn-outline"
+          onClick={onReset}
+        >
+          Screen Another Child
         </button>
       </div>
 

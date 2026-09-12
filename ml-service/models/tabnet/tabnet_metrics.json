@@ -1,0 +1,133 @@
+{
+  "model_name": "TabNet Multi-Task Classifier",
+  "architecture": "TabNet(n_d=16, n_a=16, n_steps=4, gamma=1.3, lambda_sparse=0.0001)",
+  "dataset": "NFHS-5 dhs_clean.parquet (198,849 records)",
+  "dataset_split": {
+    "train": 139194,
+    "val": 29827,
+    "test": 29828
+  },
+  "training_time_seconds": 207.45,
+  "inference_latency": {
+    "total_test_seconds": 0.7814,
+    "per_sample_ms": 0.0262
+  },
+  "overall_metrics": {
+    "exact_match_accuracy": 0.2657,
+    "hamming_loss": 0.4242,
+    "macro_f1": 0.5141,
+    "macro_precision": 0.3999,
+    "macro_recall": 0.7196,
+    "weighted_f1": 0.5671,
+    "macro_roc_auc": 0.6283
+  },
+  "threshold_calibration": {
+    "Stunting": {
+      "selected_threshold": 0.3,
+      "val_f1": 0.5574,
+      "reason": "Optimized on validation set to maximize F1-score (0.5574)"
+    },
+    "Wasting": {
+      "selected_threshold": 0.2,
+      "val_f1": 0.3183,
+      "reason": "Optimized on validation set to maximize F1-score (0.3183)"
+    },
+    "Malnutrition": {
+      "selected_threshold": 0.35,
+      "val_f1": 0.671,
+      "reason": "Optimized on validation set to maximize F1-score (0.6710)"
+    }
+  },
+  "per_condition_metrics": {
+    "Stunting": {
+      "accuracy": 0.5529,
+      "precision": 0.4318,
+      "recall_sensitivity": 0.7703,
+      "specificity": 0.4308,
+      "f1_score": 0.5534,
+      "roc_auc": 0.6486,
+      "optimal_threshold": 0.3,
+      "support_positive": 10725,
+      "support_total": 29828
+    },
+    "Wasting": {
+      "accuracy": 0.6311,
+      "precision": 0.244,
+      "recall_sensitivity": 0.4534,
+      "specificity": 0.6725,
+      "f1_score": 0.3173,
+      "roc_auc": 0.5961,
+      "optimal_threshold": 0.2,
+      "support_positive": 5639,
+      "support_total": 29828
+    },
+    "Malnutrition": {
+      "accuracy": 0.5435,
+      "precision": 0.524,
+      "recall_sensitivity": 0.935,
+      "specificity": 0.1533,
+      "f1_score": 0.6716,
+      "roc_auc": 0.6402,
+      "optimal_threshold": 0.35,
+      "support_positive": 14891,
+      "support_total": 29828
+    }
+  },
+  "confusion_matrices": {
+    "Stunting": [
+      [
+        8229,
+        10874
+      ],
+      [
+        2463,
+        8262
+      ]
+    ],
+    "Wasting": [
+      [
+        16268,
+        7921
+      ],
+      [
+        3082,
+        2557
+      ]
+    ],
+    "Malnutrition": [
+      [
+        2290,
+        12647
+      ],
+      [
+        968,
+        13923
+      ]
+    ]
+  },
+  "features_used": [
+    "child_age_months",
+    "birth_weight",
+    "breastfeeding_duration",
+    "birth_order",
+    "mother_bmi",
+    "anc_visits",
+    "hhsize",
+    "sanitation_risk_index",
+    "maternal_risk_score",
+    "child_sex",
+    "education",
+    "wealth_quintile",
+    "residence",
+    "birth_size",
+    "diarrhea_recent",
+    "fever_recent",
+    "cough_recent",
+    "measles_vaccine"
+  ],
+  "target_conditions": [
+    "Stunting",
+    "Wasting",
+    "Malnutrition"
+  ]
+}
