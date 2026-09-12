@@ -230,4 +230,11 @@ def model_comparison():
 
 
 if __name__ == "__main__":
+    print("\n" + "=" * 68)
+    print("  NutriPredict AI — ML Prediction Service (Dual Model)")
+    print("  - Models: XGBoost Baseline & FT-Transformer")
+    print("  - Conditions: 10 Targets (5 Growth/Nutrition + 5 Disease Risk)")
+    print("  - Running on: http://127.0.0.1:5005")
+    print("  - Gateway Proxy: http://localhost:3000 -> http://127.0.0.1:5005")
+    print("=" * 68 + "\n")
     app.run(host="127.0.0.1", port=5005, debug=False)
