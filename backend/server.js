@@ -22,7 +22,27 @@ app.get("/api/health", async (req, res) => {
     return res.status(200).json({
       status: "degraded",
       backend: "Node.js Express",
-      ml_service: "ML Service not reachable. Please start Python Flask service on port 5000."
+      ml_service: "ML Service not reachable. Please start Python Flask service on port 5005."
+    });
+  }
+});
+
+// Dual Model (XGBoost + FT-Transformer) Side-by-Side Prediction Endpoint
+app.post("/api/prediction/dual", async (req, res) => {
+  try {
+    const payload = req.body;
+    const response = await axios.post(`${ML_SERVICE_URL}/predict`, payload, {
+      timeout: 15000,
+      headers: { "Content-Type": "application/json" }
+    });
+    return res.status(200).json(response.data);
+  } catch (error) {
+    if (error.response) {
+      return res.status(error.response.status).json(error.response.data);
+    }
+    return res.status(503).json({
+      error: "ML Service Unavailable",
+      message: "Unable to connect to the Python ML prediction service on port 5005."
     });
   }
 });
@@ -42,7 +62,7 @@ app.post("/api/prediction/transformer", async (req, res) => {
     }
     return res.status(503).json({
       error: "ML Service Unavailable",
-      message: "Unable to connect to the Python ML prediction service."
+      message: "Unable to connect to the Python ML prediction service on port 5005."
     });
   }
 });
@@ -62,7 +82,7 @@ app.post("/api/prediction/xgboost", async (req, res) => {
     }
     return res.status(503).json({
       error: "ML Service Unavailable",
-      message: "Unable to connect to the Python ML prediction service."
+      message: "Unable to connect to the Python ML prediction service on port 5005."
     });
   }
 });

@@ -113,6 +113,15 @@ export default function ChildForm({ onSubmit, loading, selectedModel, setSelecte
           </span>
           <button
             type="button"
+            className={`nav-tab-btn ${selectedModel === 'Compare Both' ? 'active' : ''}`}
+            onClick={() => setSelectedModel('Compare Both')}
+            style={{ fontSize: '0.8rem', padding: '0.35rem 0.85rem' }}
+          >
+            <Sparkles size={14} style={{ display: 'inline', marginRight: '0.35rem' }} />
+            Compare Both (Dual Model)
+          </button>
+          <button
+            type="button"
             className={`nav-tab-btn ${selectedModel === 'FT-Transformer' ? 'active' : ''}`}
             onClick={() => setSelectedModel('FT-Transformer')}
             style={{ fontSize: '0.8rem', padding: '0.35rem 0.85rem' }}
