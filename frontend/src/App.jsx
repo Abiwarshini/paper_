@@ -6,7 +6,7 @@ import { Activity, Shield, Cpu, RefreshCw, AlertCircle } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('screening'); // 'screening' | 'comparison'
-  const [selectedModel, setSelectedModel] = useState('FT-Transformer');
+  const [selectedModel, setSelectedModel] = useState('Compare Both');
   const [loading, setLoading] = useState(false);
   const [predictionResult, setPredictionResult] = useState(null);
   const [lastSubmittedChild, setLastSubmittedChild] = useState(null);
@@ -18,9 +18,11 @@ export default function App() {
     setPredictionResult(null);
     setLastSubmittedChild(formData);
 
-    const endpoint = selectedModel === 'XGBoost'
-      ? 'http://localhost:3000/api/prediction/xgboost'
-      : 'http://localhost:3000/api/prediction/transformer';
+    const endpoint = selectedModel === 'Compare Both'
+      ? 'http://localhost:3000/api/prediction/dual'
+      : (selectedModel === 'XGBoost'
+        ? 'http://localhost:3000/api/prediction/xgboost'
+        : 'http://localhost:3000/api/prediction/transformer');
 
     try {
       const response = await fetch(endpoint, {
