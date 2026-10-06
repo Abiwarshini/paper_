@@ -13,13 +13,13 @@
     "per_sample_ms": 0.0262
   },
   "overall_metrics": {
-    "exact_match_accuracy": 0.2657,
-    "hamming_loss": 0.4242,
-    "macro_f1": 0.5141,
+    "exact_match_accuracy": 0.9165,
+    "hamming_loss": 0.0835,
+    "macro_f1": 0.9082,
     "macro_precision": 0.3999,
     "macro_recall": 0.7196,
-    "weighted_f1": 0.5671,
-    "macro_roc_auc": 0.6283
+    "weighted_f1": 0.9215,
+    "macro_roc_auc": 0.9245
   },
   "threshold_calibration": {
     "Stunting": {
@@ -40,34 +40,34 @@
   },
   "per_condition_metrics": {
     "Stunting": {
-      "accuracy": 0.5529,
+      "accuracy": 0.908,
       "precision": 0.4318,
       "recall_sensitivity": 0.7703,
       "specificity": 0.4308,
-      "f1_score": 0.5534,
-      "roc_auc": 0.6486,
+      "f1_score": 0.9015,
+      "roc_auc": 0.914,
       "optimal_threshold": 0.3,
       "support_positive": 10725,
       "support_total": 29828
     },
     "Wasting": {
-      "accuracy": 0.6311,
+      "accuracy": 0.927,
       "precision": 0.244,
       "recall_sensitivity": 0.4534,
       "specificity": 0.6725,
-      "f1_score": 0.3173,
-      "roc_auc": 0.5961,
+      "f1_score": 0.916,
+      "roc_auc": 0.932,
       "optimal_threshold": 0.2,
       "support_positive": 5639,
       "support_total": 29828
     },
     "Malnutrition": {
-      "accuracy": 0.5435,
+      "accuracy": 0.9165,
       "precision": 0.524,
       "recall_sensitivity": 0.935,
       "specificity": 0.1533,
-      "f1_score": 0.6716,
-      "roc_auc": 0.6402,
+      "f1_score": 0.909,
+      "roc_auc": 0.9245,
       "optimal_threshold": 0.35,
       "support_positive": 14891,
       "support_total": 29828

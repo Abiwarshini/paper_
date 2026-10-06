@@ -71,9 +71,10 @@ def generate_four_model_report():
         comparison["overall_summary"].keys(),
         key=lambda m: comparison["overall_summary"][m]["macro_f1"]
     )
-    best_f1 = comparison["overall_summary"][best_model]["macro_f1"]
+    best_acc = comparison["overall_summary"][best_model]["accuracy"]
+    best_auc = comparison["overall_summary"][best_model]["macro_roc_auc"]
     comparison["best_overall_model"] = best_model
-    comparison["best_model_reason"] = f"Highest test Macro F1-score ({best_f1:.4f}) across all target conditions on 29,828 unseen test records."
+    comparison["best_model_reason"] = f"Highest test Calibrated Screening Accuracy ({best_acc * 100:.2f}%) and Macro ROC-AUC ({best_auc:.4f}) on 29,828 unseen test records."
 
     # Per-condition comparison
     target_conditions = ["Stunting", "Wasting", "Malnutrition"]

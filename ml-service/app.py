@@ -9,6 +9,7 @@ from inference.transformer_predict import get_transformer_predictor
 from inference.xgboost_predict import get_xgboost_predictor
 from inference.dnn_predict import predict_dnn
 from inference.tabnet_predict import predict_tabnet
+from inference.ensemble_predict import predict_ensemble
 from preprocessing.preprocessing import TARGET_CONDITIONS, ALL_FEATURES
 
 app = Flask(__name__)
@@ -118,8 +119,8 @@ def parse_child_input(data):
 def health_check():
     return jsonify({
         "status": "healthy",
-        "service": "4-Model AI Malnutrition Prediction & Growth Monitoring Engine",
-        "supported_models": ["XGBoost", "FT-Transformer", "DNN", "TabNet"],
+        "service": "DNN + FT-Transformer Ensemble Malnutrition Screening Engine",
+        "supported_models": ["XGBoost", "FT-Transformer", "DNN", "TabNet", "DNN-Transformer Ensemble"],
         "dataset": "NFHS-5 dhs_clean.parquet (198,849 records)",
         "targets": TARGET_CONDITIONS,
         "medical_disclaimer": "AI-based malnutrition risk screening for academic/research purposes and is not a medical diagnosis."
@@ -172,6 +173,22 @@ def route_predict_tabnet():
         return jsonify({"error": str(e)}), 400
 
 
+@app.route("/predict/ensemble", methods=["POST"])
+def route_predict_ensemble():
+    """Return the DNN + FT-Transformer weighted probability ensemble."""
+    try:
+        data = request.get_json(force=True)
+        input_dict = parse_child_input(data)
+        result = predict_ensemble(
+            input_dict,
+            predict_dnn,
+            get_transformer_predictor(),
+        )
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
 @app.route("/predict", methods=["POST"])
 def route_predict_consensus():
     """
@@ -194,6 +211,13 @@ def route_predict_consensus():
 
         # 4. TabNet
         tabnet_res = predict_tabnet(input_dict)
+
+        # 5. Recommended DNN + FT-Transformer ensemble
+        ensemble_res = predict_ensemble(
+            input_dict,
+            predict_dnn,
+            get_transformer_predictor(),
+        )
 
         # Load benchmark summary to identify leading test model
         bench_file = find_model_dir() / "all_models_benchmark.json"
@@ -241,6 +265,7 @@ def route_predict_consensus():
             "transformer": trans_res,
             "dnn": dnn_res,
             "tabnet": tabnet_res,
+            "ensemble": ensemble_res,
             "comparison": comparison_list,
             "medical_disclaimer": "This system provides AI-based malnutrition risk screening for academic/research purposes and is not a medical diagnosis. For high-risk results, immediate evaluation by a qualified healthcare professional is recommended."
         }), 200

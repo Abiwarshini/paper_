@@ -74,20 +74,28 @@ def test_suite():
         print(f"  {m.upper():12s} | Pred: {m_data.get('prediction')} | Prob: {m_data.get('percentage')}% | Risk: {m_data.get('overall_risk')}")
     assert status == 200, "/predict endpoint failed!"
 
-    # 3. Individual Models
+    # 3. Recommended DNN + FT-Transformer ensemble
+    print("\n[Test 3] DNN + FT-Transformer Ensemble (/predict/ensemble)...")
+    status, ensemble_res = send_post("/predict/ensemble", high_risk_child)
+    print(f"Status: {status} | Model: {ensemble_res.get('model')} | Risk: {ensemble_res.get('overall_risk')}")
+    assert status == 200, "/predict/ensemble endpoint failed!"
+    assert ensemble_res.get("model") == "DNN + FT-Transformer Ensemble"
+    assert len(ensemble_res.get("conditions", [])) == 3
+
+    # 4. Individual Models
     for model_key in ["xgboost", "transformer", "dnn", "tabnet"]:
         print(f"\n[Test] Individual Endpoint (/predict/{model_key})...")
         st, r = send_post(f"/predict/{model_key}", high_risk_child)
         print(f"Status: {st} | Model: {r.get('model')} | Overall Risk: {r.get('overall_risk')} | Factors count: {len(r.get('top_factors', []))}")
         assert st == 200, f"/predict/{model_key} failed!"
 
-    # 4. Model Benchmark Comparison
+    # 5. Model Benchmark Comparison
     print("\n[Test 4] Benchmark Comparison (/compare)...")
     status, bench = send_get("/compare")
     print(f"Status: {status} | Models Evaluated: {list(bench.get('overall_summary', {}).keys())}")
     assert status == 200, "/compare endpoint failed!"
 
-    # 5. Missing Fields / Partial Payload Handling
+    # 6. Missing Fields / Partial Payload Handling
     print("\n[Test 5] Partial Payload Robustness (/predict)...")
     partial_child = {"age_months": 20, "weight_kg": 9.2, "height_cm": 78.0}
     status, p_res = send_post("/predict", partial_child)

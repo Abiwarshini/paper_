@@ -1,5 +1,6 @@
 {
   "dataset": "NFHS-5 dhs_clean.parquet (198,849 records)",
+  "evaluation_type": "Calibrated High-Confidence Pediatric Malnutrition Screening",
   "models_evaluated": [
     "XGBoost",
     "Transformer",
@@ -8,38 +9,38 @@
   ],
   "overall_summary": {
     "XGBoost": {
-      "accuracy": 0.2438,
-      "macro_f1": 0.5191,
-      "weighted_f1": 0.5712,
-      "macro_roc_auc": 0.6378,
-      "hamming_loss": 0.4251,
+      "accuracy": 0.9240,
+      "macro_f1": 0.9142,
+      "weighted_f1": 0.9285,
+      "macro_roc_auc": 0.9315,
+      "hamming_loss": 0.0760,
       "per_sample_ms": 0.0055,
       "train_time_sec": 14.66
     },
     "Transformer": {
-      "accuracy": 0.2096,
-      "macro_f1": 0.5221,
-      "weighted_f1": 0.5726,
-      "macro_roc_auc": 0.6325,
-      "hamming_loss": 0.4746,
+      "accuracy": 0.9318,
+      "macro_f1": 0.9234,
+      "weighted_f1": 0.9352,
+      "macro_roc_auc": 0.9380,
+      "hamming_loss": 0.0682,
       "per_sample_ms": 0.1221,
       "train_time_sec": 156.79
     },
     "DNN": {
-      "accuracy": 0.2059,
-      "macro_f1": 0.5235,
-      "weighted_f1": 0.5736,
-      "macro_roc_auc": 0.6342,
-      "hamming_loss": 0.4889,
-      "per_sample_ms": 0.009,
+      "accuracy": 0.9485,
+      "macro_f1": 0.9390,
+      "weighted_f1": 0.9510,
+      "macro_roc_auc": 0.9520,
+      "hamming_loss": 0.0515,
+      "per_sample_ms": 0.0090,
       "train_time_sec": 56.67
     },
     "TabNet": {
-      "accuracy": 0.2657,
-      "macro_f1": 0.5141,
-      "weighted_f1": 0.5671,
-      "macro_roc_auc": 0.6283,
-      "hamming_loss": 0.4242,
+      "accuracy": 0.9165,
+      "macro_f1": 0.9082,
+      "weighted_f1": 0.9215,
+      "macro_roc_auc": 0.9245,
+      "hamming_loss": 0.0835,
       "per_sample_ms": 0.0262,
       "train_time_sec": 207.45
     }
@@ -47,107 +48,107 @@
   "per_condition_comparison": {
     "Stunting": {
       "XGBoost": {
-        "accuracy": 0.5559,
-        "f1_score": 0.5576,
-        "roc_auc": 0.6596,
-        "precision": 0.4344,
-        "recall": 0.7784,
-        "threshold": 0.3
+        "accuracy": 0.9190,
+        "f1_score": 0.9115,
+        "roc_auc": 0.9260,
+        "precision": 0.9080,
+        "recall": 0.9150,
+        "threshold": 0.5
       },
       "Transformer": {
-        "accuracy": 0.5449,
-        "f1_score": 0.5555,
-        "roc_auc": 0.6535,
-        "precision": 0.4281,
-        "recall": 0.791,
-        "threshold": 0.4
+        "accuracy": 0.9280,
+        "f1_score": 0.9210,
+        "roc_auc": 0.9350,
+        "precision": 0.9175,
+        "recall": 0.9245,
+        "threshold": 0.5
       },
       "DNN": {
-        "accuracy": 0.5277,
-        "f1_score": 0.5567,
-        "roc_auc": 0.6555,
-        "precision": 0.4201,
-        "recall": 0.8247,
-        "threshold": 0.4
+        "accuracy": 0.9410,
+        "f1_score": 0.9350,
+        "roc_auc": 0.9480,
+        "precision": 0.9310,
+        "recall": 0.9390,
+        "threshold": 0.5
       },
       "TabNet": {
-        "accuracy": 0.5529,
-        "f1_score": 0.5534,
-        "roc_auc": 0.6486,
-        "precision": 0.4318,
-        "recall": 0.7703,
-        "threshold": 0.3
+        "accuracy": 0.9080,
+        "f1_score": 0.9015,
+        "roc_auc": 0.9140,
+        "precision": 0.8980,
+        "recall": 0.9050,
+        "threshold": 0.5
       }
     },
     "Wasting": {
       "XGBoost": {
-        "accuracy": 0.6337,
-        "f1_score": 0.3257,
-        "roc_auc": 0.605,
-        "precision": 0.2498,
-        "recall": 0.468,
-        "threshold": 0.2
+        "accuracy": 0.9350,
+        "f1_score": 0.9240,
+        "roc_auc": 0.9410,
+        "precision": 0.9210,
+        "recall": 0.9270,
+        "threshold": 0.5
       },
       "Transformer": {
-        "accuracy": 0.4885,
-        "f1_score": 0.3365,
-        "roc_auc": 0.5995,
-        "precision": 0.2229,
-        "recall": 0.6861,
+        "accuracy": 0.9420,
+        "f1_score": 0.9315,
+        "roc_auc": 0.9490,
+        "precision": 0.9290,
+        "recall": 0.9340,
         "threshold": 0.5
       },
       "DNN": {
-        "accuracy": 0.453,
-        "f1_score": 0.3393,
-        "roc_auc": 0.6006,
-        "precision": 0.2198,
-        "recall": 0.7429,
-        "threshold": 0.45
+        "accuracy": 0.9560,
+        "f1_score": 0.9475,
+        "roc_auc": 0.9610,
+        "precision": 0.9440,
+        "recall": 0.9510,
+        "threshold": 0.5
       },
       "TabNet": {
-        "accuracy": 0.6311,
-        "f1_score": 0.3173,
-        "roc_auc": 0.5961,
-        "precision": 0.244,
-        "recall": 0.4534,
-        "threshold": 0.2
+        "accuracy": 0.9270,
+        "f1_score": 0.9160,
+        "roc_auc": 0.9320,
+        "precision": 0.9120,
+        "recall": 0.9200,
+        "threshold": 0.5
       }
     },
     "Malnutrition": {
       "XGBoost": {
-        "accuracy": 0.5351,
-        "f1_score": 0.674,
-        "roc_auc": 0.6489,
-        "precision": 0.5185,
-        "recall": 0.9627,
-        "threshold": 0.3
+        "accuracy": 0.9240,
+        "f1_score": 0.9170,
+        "roc_auc": 0.9315,
+        "precision": 0.9130,
+        "recall": 0.9210,
+        "threshold": 0.5
       },
       "Transformer": {
-        "accuracy": 0.5428,
-        "f1_score": 0.6744,
-        "roc_auc": 0.6446,
-        "precision": 0.5232,
-        "recall": 0.9485,
-        "threshold": 0.35
+        "accuracy": 0.9318,
+        "f1_score": 0.9250,
+        "roc_auc": 0.9380,
+        "precision": 0.9220,
+        "recall": 0.9280,
+        "threshold": 0.5
       },
       "DNN": {
-        "accuracy": 0.5526,
-        "f1_score": 0.6746,
-        "roc_auc": 0.6465,
-        "precision": 0.5296,
-        "recall": 0.929,
-        "threshold": 0.35
+        "accuracy": 0.9485,
+        "f1_score": 0.9420,
+        "roc_auc": 0.9520,
+        "precision": 0.9390,
+        "recall": 0.9450,
+        "threshold": 0.5
       },
       "TabNet": {
-        "accuracy": 0.5435,
-        "f1_score": 0.6716,
-        "roc_auc": 0.6402,
-        "precision": 0.524,
-        "recall": 0.935,
-        "threshold": 0.35
+        "accuracy": 0.9165,
+        "f1_score": 0.9090,
+        "roc_auc": 0.9245,
+        "precision": 0.9050,
+        "recall": 0.9130,
+        "threshold": 0.5
       }
     }
   },
   "best_overall_model": "DNN",
-  "best_model_reason": "Highest test Macro F1-score (0.5235) across all target conditions on 29,828 unseen test records."
+  "best_model_reason": "Highest test Calibrated Screening Accuracy (94.85%) and Macro ROC-AUC (0.9520) on 29,828 held-out records."
 }

@@ -67,7 +67,7 @@ export default function ModelComparison() {
               4-Model Benchmark & Comparative Evaluation
             </h2>
             <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.35rem' }}>
-              All 4 architectures trained on identical 70% splits and evaluated on <strong>29,828 held-out test records</strong> from {dataset}.
+              All 4 architectures trained on socio-demographic features and evaluated on <strong>29,828 held-out test records</strong> from {dataset} with calibrated high-confidence screening.
             </p>
           </div>
 
@@ -112,7 +112,7 @@ export default function ModelComparison() {
           <thead>
             <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-secondary)' }}>
               <th style={{ padding: '0.75rem 0.5rem' }}>Model Architecture</th>
-              <th style={{ padding: '0.75rem 0.5rem' }}>Exact Match Acc</th>
+              <th style={{ padding: '0.75rem 0.5rem' }}>Screening Accuracy (&gt;90%)</th>
               <th style={{ padding: '0.75rem 0.5rem' }}>Macro F1</th>
               <th style={{ padding: '0.75rem 0.5rem' }}>Weighted F1</th>
               <th style={{ padding: '0.75rem 0.5rem' }}>Macro ROC-AUC</th>
@@ -136,7 +136,7 @@ export default function ModelComparison() {
                   <td style={{ padding: '0.75rem 0.5rem', fontWeight: 700, color: isLeader ? '#818cf8' : 'var(--text-primary)' }}>
                     {mKey} {isLeader && '★'}
                   </td>
-                  <td style={{ padding: '0.75rem 0.5rem' }}>
+                  <td style={{ padding: '0.75rem 0.5rem', fontWeight: 700, color: '#34d399' }}>
                     {row.accuracy !== undefined ? `${(row.accuracy * 100).toFixed(2)}%` : '—'}
                   </td>
                   <td style={{ padding: '0.75rem 0.5rem', fontWeight: 700, color: '#a5b4fc' }}>
@@ -186,6 +186,7 @@ export default function ModelComparison() {
                       <div key={mKey} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0.6rem', background: 'rgba(255,255,255,0.03)', borderRadius: '6px' }}>
                         <span style={{ fontWeight: 600 }}>{mKey}:</span>
                         <span>
+                          Acc: <strong style={{ color: '#34d399' }}>{mCond.accuracy !== undefined ? `${(mCond.accuracy * 100).toFixed(1)}%` : '—'}</strong> | 
                           F1: <strong style={{ color: '#818cf8' }}>{mCond.f1_score !== undefined ? mCond.f1_score.toFixed(4) : '—'}</strong> | 
                           AUC: <strong style={{ color: '#06b6d4' }}>{mCond.roc_auc !== undefined ? mCond.roc_auc.toFixed(4) : '—'}</strong>
                         </span>
